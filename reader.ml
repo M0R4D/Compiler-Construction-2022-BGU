@@ -71,7 +71,15 @@ and nt_number str =
   let nt1 = pack nt1 (fun r -> ScmNumber r) in
   let nt1 = not_followed_by nt1 nt_symbol_char in
   nt1 str
-and nt_boolean str = raise X_not_yet_implemented
+and 
+
+let nt_boolean = 
+  let boolt = word_ci "#t" in 
+  let boolf = word_ci "#f" in
+  disj 
+    (pack boolt (fun _-> ScmBoolean(true))) 
+    (pack boolf (fun _-> ScmBoolean(false)));;
+
 and nt_char_simple str = raise X_not_yet_implemented
 and make_named_char char_name ch = raise X_not_yet_implemented
 and nt_char_named str =
