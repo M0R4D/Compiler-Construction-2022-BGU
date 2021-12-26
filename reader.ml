@@ -77,12 +77,16 @@ let nt_boolean =
   let boolt = word_ci "#t" in 
   let boolf = word_ci "#f" in
   disj 
-    (pack boolt (fun _-> ScmBoolean(true))) 
-    (pack boolf (fun _-> ScmBoolean(false)));;
+    (pack boolt (fun _ -> ScmBoolean(true))) 
+    (pack boolf (fun _ -> ScmBoolean(false)));;
 
-and nt_char_simple str = raise X_not_yet_implemented
-and make_named_char char_name ch = raise X_not_yet_implemented
-and nt_char_named str =
+and let nt_char_simple str = 
+  (* raise X_not_yet_implemented *)
+  range '!' '~'
+and let make_named_char char_name ch = 
+(* raise X_not_yet_implemented *)
+pack (word char_name) (fun _ -> ch)
+and let nt_char_named str =
   let nt1 =
     disj_list [(make_named_char "newline" '\n');
                (make_named_char "page" '\012');
@@ -90,8 +94,23 @@ and nt_char_named str =
                (make_named_char "space" ' ');
                (make_named_char "tab" '\t')] in
   nt1 str
-and nt_char_hex str = raise X_not_yet_implemented
-and nt_char str = raise X_not_yet_implemented
+and 
+let let nt_char_hex str = 
+  (* raise X_not_yet_implemented *)
+  let nt_x = char 'x' in 
+  let nt_hex = disj (range '0' '9') (range 'a' 'f') in 
+  caten nt_x (plus nt_hex)
+
+and let nt_char str = 
+  let nt_char_prefix = word "#\\" in
+  let nt2 = disj nt_char_named nt_char_hex in 
+  let nt1 = caten 
+                nt_char_prefix
+                nt2
+                in 
+  pack nt1 (fun (l, p) -> ScmChar p)
+                
+
 and nt_symbol_char str = raise X_not_yet_implemented
 and nt_symbol str =
   let nt1 = plus nt_symbol_char in

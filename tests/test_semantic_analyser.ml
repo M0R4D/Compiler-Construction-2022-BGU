@@ -15,6 +15,12 @@ input =
     [ScmApplic (ScmVar "+",
       [ScmVar "x"; ScmConst (ScmNumber (ScmRational (1, 1)))]);
      ScmLambdaSimple (["y"], ScmSet (ScmVar "x", ScmVar "y"))]));
+     (* 
+     (lambda (x)
+       (list 
+          (+ x 1)
+          (lambda (y) (set! x y))))
+     *)
 expected =
    ScmLambdaSimple' (["x"],
    ScmApplic' (ScmVar' (VarFree "list"),
