@@ -110,14 +110,15 @@ module Semantic_Analysis : SEMANTIC_ANALYSIS = struct
       match pe with
       | ScmConst value                  -> ScmConst' value (* DONE *)
       | ScmVar name                     -> ScmVar' (tag_lexical_address_for_var name params env) (* DONE *)
-      | ScmIf test dit dif              -> ScmIf' (run test params env) (run dit params env) (run dif params env) (* DONE *) (*TODO: add parenthes*)
+      | ScmIf (test, dit, dif)          -> ScmIf' ((run test params env), (run dit params env), (run dif params env)) (* DONE *) (*TODO: add parenthes*)
       | ScmSeq es                       -> ScmSeq' (List.map (fun e -> run e params env) es) (* DONE *)
-      | ScmSet (var, value)             -> ScmSet' (tag_lexical_address_for_var var params env, run value params env) (* DONE *)
-      | ScmDef (var, value)             -> ScmDef' (tag_lexical_address_for_var var params env, run value params env) (* DONE *)
+      | ScmSet (ScmVar(var), value)     -> ScmSet' (tag_lexical_address_for_var var params env, run value params env)
+      | ScmDef (ScmVar(var), value)     -> ScmDef' (tag_lexical_address_for_var var params env, run value params env) 
       | ScmOr exps                      -> ScmOr' (List.map (fun e -> run e params env) exps) (* DONE *)
-      | ScmLambdaSimple (vars, body)    -> ScmLambdaSimple' (vars, run body vars (params @ env)) (* DONE *)
-      | ScmLambdaOpt (vars, var, body)  -> ScmLambdaOpt' (vars, var, run body (var :: vars) (params @ env)) (* DONE *)
+      | ScmLambdaSimple (vars, body)    -> ScmLambdaSimple' (vars, run body vars ([params] @ env)) (* DONE *)
+      | ScmLambdaOpt (vars, var, body)  -> ScmLambdaOpt' (vars, var, run body (var :: vars) ([params] @ env)) (* DONE *)
       | ScmApplic (f, args)             -> ScmApplic' (run f params env, List.map (fun e -> run e params env) args) (* DONE *)
+      | _ -> raise X_this_should_not_happen
    in 
    run pe [] [];;
 
@@ -133,21 +134,21 @@ module Semantic_Analysis : SEMANTIC_ANALYSIS = struct
   
   (* run this second! *)
   let annotate_tail_calls pe =
-   let rec run pe in_tail =
-    match pe with
-      | ScmConst' value                  -> ScmConst' value (* DONE *)
-      | ScmVar' name                     -> ScmVar' name (* DONE *)
-      | ScmIf' test dit dif              -> ScmIf' (run test false) (run dit in_tail) (run dif in_tail) (* DONE *)
-      | ScmSeq' exp                      -> let (except_last, last) = rdc_rac exp in ScmSeq' (List.map (fun e -> run e false) except_last) @ [run last in_tail] (* DONE *)
-      | ScmSet' (var, value)             -> ScmSet' var (run value false) (* DONE *)
-      | ScmDef' (var, value)             -> ScmDef' var (run value false) (* DONE *)
-      | ScmOr' exps                      -> let (except_last, last) = rdc_rac exp in ScmOr' (List.map (fun e -> run e false) except_last) @ [run last in_tail] (* DONE *)
-      | ScmLambdaSimple' (vars, body)    -> ScmLambdaSimple' (vars, run body true) (* DONE *)
-      | ScmLambdaOpt' (vars, var, body)  -> ScmLambdaOpt' (vars, var, run body true) (* DONE *)
-      | ScmApplic' (f, args)             -> if in_tail = true then ScmApplicTP' (run f false) (List.map (fun e -> run e false ) args) else ScmApplic' (run f false) (List.map (fun e -> run e false ) args) (* DONE *)
-      | _ -> raise X_this_should_not_happen 
-   in 
-   run pe false;;
+    let rec run pe in_tail =
+     match pe with
+       | ScmConst' value                  -> ScmConst' value (* DONE *)
+       | ScmVar' name                     -> ScmVar' name (* DONE *)
+       | ScmIf' (test, dit, dif)          -> ScmIf' ((run test false), (run dit in_tail), (run dif in_tail)) (* DONE *)
+       | ScmSeq' exp                      -> let (except_last, last) = rdc_rac exp in ScmSeq' ((List.map (fun e -> run e false) except_last) @ [run last in_tail]) (* DONE *)
+       | ScmSet' (var, value)             -> ScmSet' (var, (run value false)) (* DONE *)
+       | ScmDef' (var, value)             -> ScmDef' (var, (run value false)) (* DONE *)
+       | ScmOr' exps                      -> let (except_last, last) = rdc_rac exps in ScmOr' ((List.map (fun e -> run e false) except_last) @ [run last in_tail]) (* DONE *)
+       | ScmLambdaSimple' (vars, body)    -> ScmLambdaSimple' (vars, run body true) (* DONE *)
+       | ScmLambdaOpt' (vars, var, body)  -> ScmLambdaOpt' (vars, var, run body true) (* DONE *)
+       | ScmApplic' (f, args)             -> if in_tail = true then ScmApplicTP' ((run f false), (List.map (fun e -> run e false ) args)) else ScmApplic' ((run f false), (List.map (fun e -> run e false ) args)) (* DONE *)
+       | _ -> raise X_this_should_not_happen 
+    in 
+    run pe false;;
 
   (* boxing *)
 
