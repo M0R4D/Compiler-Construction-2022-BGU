@@ -110,10 +110,10 @@ module Semantic_Analysis : SEMANTIC_ANALYSIS = struct
       match pe with
       | ScmConst value                  -> ScmConst' value (* DONE *)
       | ScmVar name                     -> ScmVar' (tag_lexical_address_for_var name params env) (* DONE *)
-      | ScmIf (test, dit, dif)          -> ScmIf' ((run test params env), (run dit params env), (run dif params env)) (* DONE *) (*TODO: add parenthes*)
+      | ScmIf (test, dit, dif)          -> ScmIf' ((run test params env), (run dit params env), (run dif params env)) (* DONE *)
       | ScmSeq es                       -> ScmSeq' (List.map (fun e -> run e params env) es) (* DONE *)
-      | ScmSet (ScmVar(var), value)     -> ScmSet' (tag_lexical_address_for_var var params env, run value params env)
-      | ScmDef (ScmVar(var), value)     -> ScmDef' (tag_lexical_address_for_var var params env, run value params env) 
+      | ScmSet (ScmVar(var), value)     -> ScmSet' (tag_lexical_address_for_var var params env, run value params env) (* DONE *)
+      | ScmDef (ScmVar(var), value)     -> ScmDef' (tag_lexical_address_for_var var params env, run value params env) (* DONE *)
       | ScmOr exps                      -> ScmOr' (List.map (fun e -> run e params env) exps) (* DONE *)
       | ScmLambdaSimple (vars, body)    -> ScmLambdaSimple' (vars, run body vars ([params] @ env)) (* DONE *)
       | ScmLambdaOpt (vars, var, body)  -> ScmLambdaOpt' (vars, var, run body (var :: vars) ([params] @ env)) (* DONE *)
