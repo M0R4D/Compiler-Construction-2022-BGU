@@ -57,6 +57,15 @@ let rec scm_list_to_list = function
 | ScmNil -> []
 | sexpr -> raise (X_syntax_error (sexpr, "Expected proper list"));;
 
+let rec scm_improper_list_to_list = function
+| ScmPair (hd, tl) -> hd::(scm_list_to_list tl)
+| _ -> []
+
+let rec remove_list_last_element = function
+  | hd::[] -> [] 
+  | hd::tl -> hd::(remove_list_last_element tl) 
+  | [] -> [];;
+
 let rec scm_is_list = function
 | ScmPair (hd, tl) -> scm_is_list tl
 | ScmNil -> true
@@ -162,6 +171,8 @@ let reserved_word_list =
 let rec tag_parse_expression sexpr =
 let sexpr = macro_expand sexpr in
 match sexpr with 
+(* Implement tag parsing here *)
+
 (* Conatants: *)
 (* NULL *)
 | ScmNil -> ScmConst (ScmNil) 
@@ -176,9 +187,8 @@ match sexpr with
 (* Qouted Expressions *)
 | ScmPair(ScmSymbol("quote"), ScmPair(sexpr, ScmNil)) -> ScmConst sexpr
 
-(* Variables Here *)
-(*  *)
-| ScmSymbol(symbol) -> ScmVar (symbol) (* TODO: add reserevd word exception *)
+(* Variables *)
+| ScmSymbol(symbol) -> if (List.mem symbol reserved_word_list) then raise X_reserved_word (symbol) else ScmVar (symbol)
 
 (* Conditionals: (if test then else) , (if test then void)  *)
 | ScmPair(ScmSymbol("if"), ScmPair(test, ScmPair(dit, ScmPair(dif, ScmNil)))) -> 
@@ -192,19 +202,17 @@ match sexpr with
 | SmcPair(ScmSymbol("or"), exps) -> ScmOr (List.map tag_parse_expression (scm_list_to_list exps))
 
 (* Lambda Expressions: Simple lambda, Optional lambda, Variadic lambda *)
-| ScmPair(ScmSymbol("lambda"), ScmPair(vars, body)) -> (* TODO *)
-    try list_to_improper_list vars with X_proper_list_error
-    ScmLambdaSimple ((* convert vars to list *), tag_parse_expression body)
-| ScmPair(ScmSymbol("lambda"), ScmPair(ScmPair(vars, var), body)) -> (* TODO *)
-(* | "Variadic Lambda" *)
-| ScmPair(ScmSymbol("lambda"), ScmPair(ScmSymbol(symbol), body)) -> 
-    ScmLambdaOpt([], symbol, tag_parse_expression body)
+| ScmPair(ScmSymbol("lambda"), ScmPair(args, body)) -> 
+    lambda_maker args body
 
 (* Define: Simple define, MIT-style define *)
 | ScmPair(ScmSymbol("define"), ScmPair(ScmSymbol(var), body)) ->
-    ScmDef (ScmVar var, tag_parse_expression body) (* If var isnt reserved *)
-| ScmPair(ScmSymbol("define"), ScmPair(ScmPair(var, args), body)) -> (* TODO *)
-    if is_proper_list args then 
+    if (List.mem var reserved_word_list) then
+      raise X_reserved_word (var)
+    else
+      ScmDef (ScmVar var, tag_parse_expression body)
+| ScmPair(ScmSymbol("define"), ScmPair(ScmPair(var, args), body)) -> 
+    ScmDefine(ScmVar var, lambda_maker args body)
 
 (* Assignments: set! operator *)
 | ScmPair(ScmSymbol("set!"), ScmPair(var, body)) ->
@@ -212,20 +220,24 @@ match sexpr with
       | ScmSymbol(var) -> ScmSet (ScmVar var, tag_parse_expression body)
       | _ -> raise X_Syntax_error (sexp, ("Expected variable on LHS of set!"))
 
-(* Applications *)
-| ScmPair(ScmSymbol(name), ScmNill) -> ScmApplic (ScmVar name, []) 
-| ScmPair(app, args) -> (ScmApplic(tag_parse_expression app, List.map (fun e -> tag_parse_expression) (scm_list_to_list args)))
-    (* if List.find (fun reserved -> reserved = name) reserved_word_list = None then
-      ScmApplic (ScmVar name, (* tag_parse_expression args*) ))
-    else
-      raise X_Syntax_error (sexp, ("Expected variable on LHS of set!")) *)
-
 (* Sequences: (begin) , (begin <one-exp>), (begin <exp1> <exp2> ... <expn>) *)
 | ScmPair(ScmSymbol("begin"), ScmNil) -> ScmConst (ScmVoid) (* begin without any expressions *)
 | ScmPair(ScmSymbol("begin"), ScmPair(exp1, ScmNill)) -> tag_parse_expression exp1 (* begin with one expression *)
-| ScmPair(ScmSymbol("begin"), body) -> ScmSeq(List.map (fun e -> tag_parse_expression) (scm_list_to_list body)) (* begin with multiple expressions *)
+| ScmPair(ScmSymbol("begin"), body) -> ScmSeq(List.map (fun e -> tag_parse_expression e) (scm_list_to_list body)) (* begin with multiple expressions *)
 
-(* Implement tag parsing here *)
+(* Applications *)
+| ScmPair(app, args) -> 
+    match app with 
+      | ScmSymbol(app) -> if (List.mem app reserved_word_list) then
+                            raise X_reserved_word (app)
+                          else
+                            ScmApplic (ScmVar app, List.map (fun e -> tag_parse_expression e) (scm_list_to_list args))
+      | _ -> ScmApplic (tag_parse_expression app, List.map (fun e -> tag_parse_expression e) (scm_list_to_list args))
+
+| ScmPair(ScmSymbol(name), ScmNill) -> ScmApplic (ScmVar name, []) 
+| ScmPair(app, args) -> (ScmApplic(tag_parse_expression app, List.map (fun e -> tag_parse_expression e) (scm_list_to_list args)))
+
+(* Error: this should not happen *)
 | _ -> raise (X_syntax_error (sexpr, "Sexpr structure not recognized"))
 
 and lambda_maker args body = 
@@ -235,11 +247,19 @@ and lambda_maker args body =
       | _ -> optional_lambda_maker args body
 
 and simple_lambda_maker args body = 
-    (* ScmLambdaSimple (List.map (fun e -> ScmVar e) (scm_list_to_list args), body) *)
+    ScmLambdaSimple (scm_list_to_list args, body_maker body)
 and optional_lambda_maker args body = 
-    (* ScmLambdaOpt (List.map (fun e -> ScmVar e) (scm_list_to_list args), body) *)
+    let vars = scm_improper_list_to_list args in 
+    let var = List.nth vars ((List.length vars) - 1) in
+    let vars = remove_list_last_element vars in
+    ScmLambdaOpt (vars, var, body_maker body) 
 and variadic_lambda_maker symbol body = 
-    (* ScmLambdaOpt ([], ScmVar symbol, body) *)
+    ScmLambdaOpt ([], symbol, body_maker body)
+
+and body_maker body = 
+  match body with
+    | ScmPair(b , ScmNil) -> tag_parse_expression b
+    | _ -> ScmSeq(List.map (fun e -> tag_parse_expression e) (scm_list_to_list body))
 
 and macro_expand sexpr =
 match sexpr with
