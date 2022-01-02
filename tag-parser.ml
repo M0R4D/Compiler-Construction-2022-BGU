@@ -17,6 +17,11 @@ exception X_reserved_word of string;;
 exception X_proper_list_error;;
 exception X_not_implemented;;
 
+let rec is_proper_list = function
+  | ScmNil -> true
+  | ScmPair(car, cdr) -> is_proper_list(cdr)
+  | _ -> false;;
+
 let rec list_to_proper_list = function
 | [] -> ScmNil
 | hd::[] -> ScmPair (hd, ScmNil)
@@ -187,17 +192,19 @@ match sexpr with
 | SmcPair(ScmSymbol("or"), exps) -> ScmOr (List.map tag_parse_expression (scm_list_to_list exps))
 
 (* Lambda Expressions: Simple lambda, Optional lambda, Variadic lambda *)
-| ScmPair(ScmSymbol("lambda"), ScmPair(vars, body)) ->
+| ScmPair(ScmSymbol("lambda"), ScmPair(vars, body)) -> (* TODO *)
+    try list_to_improper_list vars with X_proper_list_error
     ScmLambdaSimple ((* convert vars to list *), tag_parse_expression body)
-| ScmPair(ScmSymbol("lambda"), ScmPair(ScmPair(vars, var), body)) ->
+| ScmPair(ScmSymbol("lambda"), ScmPair(ScmPair(vars, var), body)) -> (* TODO *)
 (* | "Variadic Lambda" *)
 | ScmPair(ScmSymbol("lambda"), ScmPair(ScmSymbol(symbol), body)) -> 
     ScmLambdaOpt([], symbol, tag_parse_expression body)
 
 (* Define: Simple define, MIT-style define *)
 | ScmPair(ScmSymbol("define"), ScmPair(ScmSymbol(var), body)) ->
-    ScmDef (var, tag_parse_expression body) (* If var isnt reserved *)
-| ScmPair(ScmSymbol("define"), ScmPair(ScmPair(var, args), body)) ->
+    ScmDef (ScmVar var, tag_parse_expression body) (* If var isnt reserved *)
+| ScmPair(ScmSymbol("define"), ScmPair(ScmPair(var, args), body)) -> (* TODO *)
+    if is_proper_list args then 
 
 (* Assignments: set! operator *)
 | ScmPair(ScmSymbol("set!"), ScmPair(var, body)) ->
@@ -220,6 +227,19 @@ match sexpr with
 
 (* Implement tag parsing here *)
 | _ -> raise (X_syntax_error (sexpr, "Sexpr structure not recognized"))
+
+and lambda_maker args body = 
+    if is_proper_list args then simple_lambda_maker args body
+    else match args with 
+      | ScmSymbol(symbol) -> variadic_lambda_maker symbol body
+      | _ -> optional_lambda_maker args body
+
+and simple_lambda_maker args body = 
+    (* ScmLambdaSimple (List.map (fun e -> ScmVar e) (scm_list_to_list args), body) *)
+and optional_lambda_maker args body = 
+    (* ScmLambdaOpt (List.map (fun e -> ScmVar e) (scm_list_to_list args), body) *)
+and variadic_lambda_maker symbol body = 
+    (* ScmLambdaOpt ([], ScmVar symbol, body) *)
 
 and macro_expand sexpr =
 match sexpr with
