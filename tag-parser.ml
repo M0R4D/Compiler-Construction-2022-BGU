@@ -36,7 +36,7 @@ let rec scm_append scm_list sexpr =
 match scm_list with
 | ScmNil -> sexpr
 | ScmPair (car, cdr) -> ScmPair (car, scm_append cdr sexpr)
-| _ -> raise (X_syntax_error (scm_list, "Append expects a proper list"))
+| _ -> raise (X_syntax_error (scm_list, "Append expects a proper list"));;
 
 let rec scm_map f sexpr =
 match sexpr with
@@ -57,14 +57,21 @@ let rec scm_list_to_list = function
 | ScmNil -> []
 | sexpr -> raise (X_syntax_error (sexpr, "Expected proper list"));;
 
+let rec symbols_list_to_string_list = function
+| [] -> []
+| ScmSymbol(s)::tl -> s::(symbols_list_to_string_list tl)
+| _ -> raise (X_syntax_error (ScmNil, ""));;
+
+
 let rec scm_improper_list_to_list = function
-| ScmPair (hd, tl) -> hd::(scm_list_to_list tl)
-| _ -> []
+| ScmPair (hd, tl) -> hd::(scm_improper_list_to_list tl)
+| ScmNil -> raise (X_syntax_error (ScmNil, "Expected improper list"))
+| last -> [last]
 
 let rec remove_list_last_element = function
   | hd::[] -> [] 
   | hd::tl -> hd::(remove_list_last_element tl) 
-  | [] -> [];;
+  | _ -> raise (X_syntax_error (ScmNil, ""))
 
 let rec scm_is_list = function
 | ScmPair (hd, tl) -> scm_is_list tl
@@ -188,54 +195,59 @@ match sexpr with
 | ScmPair(ScmSymbol("quote"), ScmPair(sexpr, ScmNil)) -> ScmConst sexpr
 
 (* Variables *)
-| ScmSymbol(symbol) -> if (List.mem symbol reserved_word_list) then raise X_reserved_word (symbol) else ScmVar (symbol)
+| ScmSymbol(symbol) -> if (List.mem symbol reserved_word_list) then 
+  (raise (X_reserved_word symbol))
+else ScmVar (symbol)
 
 (* Conditionals: (if test then else) , (if test then void)  *)
 | ScmPair(ScmSymbol("if"), ScmPair(test, ScmPair(dit, ScmPair(dif, ScmNil)))) -> 
     ScmIf (tag_parse_expression test, tag_parse_expression dit, tag_parse_expression dif)
-| ScmPair(ScmPair(ScmSymbol("if"), ScmPair(test, ScmPair(dit, ScmNil)))) -> 
+| ScmPair(ScmSymbol("if"), ScmPair(test, ScmPair(dit, ScmNil))) -> 
     ScmIf (tag_parse_expression test, tag_parse_expression dit, ScmConst (ScmVoid))
 
 (* Disjunctions: (or) , (or <one-exp>), (or <exp1> <exp2> ... <expn>) *)
-| SmcPair(ScmSymbol("or"), ScmNil) -> ScmConst (ScmBoolean false)
-| SmcPair(ScmSymbol("or"), ScmPair(exp, ScmNil)) -> tag_parse_expression exp
-| SmcPair(ScmSymbol("or"), exps) -> ScmOr (List.map tag_parse_expression (scm_list_to_list exps))
+| ScmPair(ScmSymbol("or"), ScmNil) -> ScmConst (ScmBoolean false)
+| ScmPair(ScmSymbol("or"), ScmPair(exp, ScmNil)) -> tag_parse_expression exp
+| ScmPair(ScmSymbol("or"), exps) -> ScmOr (List.map tag_parse_expression (scm_list_to_list exps))
 
 (* Lambda Expressions: Simple lambda, Optional lambda, Variadic lambda *)
 | ScmPair(ScmSymbol("lambda"), ScmPair(args, body)) -> 
     lambda_maker args body
 
 (* Define: Simple define, MIT-style define *)
-| ScmPair(ScmSymbol("define"), ScmPair(ScmSymbol(var), body)) ->
+| ScmPair(ScmSymbol("define"), ScmPair(ScmSymbol(var), ScmPair(body, ScmNil))) ->
     if (List.mem var reserved_word_list) then
-      raise X_reserved_word (var)
+      raise (X_reserved_word var)
     else
       ScmDef (ScmVar var, tag_parse_expression body)
-| ScmPair(ScmSymbol("define"), ScmPair(ScmPair(var, args), body)) -> 
-    ScmDefine(ScmVar var, lambda_maker args body)
+| ScmPair(ScmSymbol("define"), ScmPair(ScmPair(ScmSymbol(var), args), body)) -> 
+    ScmDef(ScmVar var, lambda_maker args body)
 
 (* Assignments: set! operator *)
-| ScmPair(ScmSymbol("set!"), ScmPair(var, body)) ->
-    match var with
-      | ScmSymbol(var) -> ScmSet (ScmVar var, tag_parse_expression body)
-      | _ -> raise X_Syntax_error (sexp, ("Expected variable on LHS of set!"))
+| ScmPair(ScmSymbol("set!"), ScmPair(ScmSymbol(var), ScmPair(body, ScmNil))) -> ScmSet (ScmVar var, tag_parse_expression body)
+| ScmPair(ScmSymbol("set!"), ScmPair(_, body)) -> raise (X_syntax_error (sexpr, "Expected variable on LHS of set!"))
+    (* match var with
+      | ScmSymbol(var) -> 
+      | _ -> raise (X_syntax_error (sexpr, "Expected variable on LHS of set!")) *)
 
 (* Sequences: (begin) , (begin <one-exp>), (begin <exp1> <exp2> ... <expn>) *)
 | ScmPair(ScmSymbol("begin"), ScmNil) -> ScmConst (ScmVoid) (* begin without any expressions *)
-| ScmPair(ScmSymbol("begin"), ScmPair(exp1, ScmNill)) -> tag_parse_expression exp1 (* begin with one expression *)
+| ScmPair(ScmSymbol("begin"), ScmPair(exp1, ScmNil)) -> tag_parse_expression exp1 (* begin with one expression *)
 | ScmPair(ScmSymbol("begin"), body) -> ScmSeq(List.map (fun e -> tag_parse_expression e) (scm_list_to_list body)) (* begin with multiple expressions *)
 
+(* Special Forms: quasiqoute, and, cond, let, let*, letrec *)
+
+
 (* Applications *)
+| ScmPair(ScmSymbol(name), ScmNil) -> ScmApplic (ScmVar name, []) 
 | ScmPair(app, args) -> 
-    match app with 
+    (match app with 
       | ScmSymbol(app) -> if (List.mem app reserved_word_list) then
-                            raise X_reserved_word (app)
+                            raise (X_reserved_word app)
                           else
                             ScmApplic (ScmVar app, List.map (fun e -> tag_parse_expression e) (scm_list_to_list args))
-      | _ -> ScmApplic (tag_parse_expression app, List.map (fun e -> tag_parse_expression e) (scm_list_to_list args))
+      | _ -> ScmApplic (tag_parse_expression app, List.map (fun e -> tag_parse_expression e) (scm_list_to_list args)))
 
-| ScmPair(ScmSymbol(name), ScmNill) -> ScmApplic (ScmVar name, []) 
-| ScmPair(app, args) -> (ScmApplic(tag_parse_expression app, List.map (fun e -> tag_parse_expression e) (scm_list_to_list args)))
 
 (* Error: this should not happen *)
 | _ -> raise (X_syntax_error (sexpr, "Sexpr structure not recognized"))
@@ -247,9 +259,9 @@ and lambda_maker args body =
       | _ -> optional_lambda_maker args body
 
 and simple_lambda_maker args body = 
-    ScmLambdaSimple (scm_list_to_list args, body_maker body)
+    try ScmLambdaSimple (symbols_list_to_string_list (scm_list_to_list args), body_maker body) with X_syntax_error(_, _) -> raise (X_syntax_error (args, "Error"))
 and optional_lambda_maker args body = 
-    let vars = scm_improper_list_to_list args in 
+    let vars = symbols_list_to_string_list (scm_improper_list_to_list args) in 
     let var = List.nth vars ((List.length vars) - 1) in
     let vars = remove_list_last_element vars in
     ScmLambdaOpt (vars, var, body_maker body) 
@@ -266,4 +278,3 @@ match sexpr with
 (* Handle macro expansion patterns here *)
 | _ -> sexpr
 end;; 
-
