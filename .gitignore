@@ -1,2 +1,3 @@
 # ignore others folder
 others/*
+.DS_Store

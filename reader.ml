@@ -71,9 +71,7 @@ and nt_number str =
   let nt1 = pack nt1 (fun r -> ScmNumber r) in
   let nt1 = not_followed_by nt1 nt_symbol_char in
   nt1 str
-and 
-
-let nt_boolean = 
+and nt_boolean = 
   let boolt = word_ci "#t" in 
   let boolf = word_ci "#f" in
   disj 

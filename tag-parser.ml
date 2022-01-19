@@ -165,6 +165,7 @@ let rec expr_eq e1 e2 =
 
 module type TAG_PARSER = sig
   val tag_parse_expression : sexpr -> expr
+  val macro_expand : sexpr -> sexpr
 end;; 
 
 module Tag_Parser : TAG_PARSER = struct
@@ -273,8 +274,72 @@ and body_maker body =
     | ScmPair(b , ScmNil) -> tag_parse_expression b
     | _ -> ScmSeq(List.map (fun e -> tag_parse_expression e) (scm_list_to_list body))
 
+
 and macro_expand sexpr =
 match sexpr with
 (* Handle macro expansion patterns here *)
+
+(* Conjunctions *)
+| ScmPair(ScmSymbol("and"), args) -> macro_expansion_and args
+
+(* Expansion for: let, let*, letrec *)
+| ScmPair(ScmSymbol("let"), ScmPair(ribs, body)) -> macro_expansion_let ribs body
+| ScmPair(ScmSymbol("let*"), ScmPair(ribs, body)) -> macro_expansion_let_star ribs body
+| ScmPair(ScmSymbol("letrec"), ScmPair(ribs, body)) -> macro_expansion_letrec ribs body
+
+(* Expansion for: cond *)
+(* | ScmPair(ScmSymbol("cond"), ScmPair(ribs, body)) -> macro_expansion_let ribs body *)
+
+(* Expansion for QuasiQoutes: quasiqoute, unqoute, unqoute-splicing *)
+| ScmPair(ScmSymbol("quasiquote"), ScmPair(exp, ScmNil)) -> macro_expansion_quasiquote exp
+
 | _ -> sexpr
+
+and macro_expansion_and args = 
+(*  {(and)} = {#t} (by definition)
+    {(and ⟨expr⟩)} = {⟨expr⟩} (#t is the unit element of and)
+    {(and ⟨expr1⟩ ⟨expr2⟩ · · · ⟨exprn⟩)} =(if {⟨expr1⟩} {(and ⟨expr2⟩ · · · ⟨exprn⟩)} {#f}) *)
+match args with
+| ScmNil -> ScmBoolean true
+| ScmPair(exp, ScmNil) -> exp
+| ScmPair(first, rest) -> ScmPair(ScmSymbol("if"), ScmPair(first, ScmPair(macro_expansion_and rest, ScmPair(ScmBoolean(false), ScmNil))))
+| _ -> raise (X_syntax_error(sexpr, "and pattern not recognized"))
+
+and macro_expansion_let ribs body =
+(* {(let ((var1 expr1) (var2 expr2) · · · (varn exprn)) body)} = {((lambda (var1 var2 · · · varn) body) expr1 expr2 · · · exprn} *)
+  ScmPair(ScmPair(ScmSymbol "lambda" , ScmPair(let_vars_helper ribs, macro_expand body)), let_exprs_helper ribs)
+
+and let_vars_helper ribs = 
+match ribs with
+| ScmNil -> ScmNil
+| ScmPair(ScmPair(ScmSymbol(var), ScmPair( _ , ScmNil)), rest) -> ScmPair(ScmSymbol(var), let_vars_helper rest)
+
+and let_exprs_helper ribs = 
+match ribs with
+| ScmNil -> ScmNil
+| ScmPair(ScmPair( _ , ScmPair(exp, ScmNil)), rest) -> ScmPair(exp, let_exprs_helper rest)
+
+and macro_expansion_let_star ribs body =
+(* {(let* ((var1 expr1) (var2 expr2) · · · (varn exprn)) body)} = 
+    = ( (lambda (var1) 
+            (lambda (var2) 
+            · · · (lambda (varn) body) exprn) exprn-1) · · · ) expr1) *)
+match ribs with
+| ScmNil -> macro_expand(ScmPair(ScmSymbol("let"), ScmPair(ScmNil, body)))
+| ScmPair(rib1 , ScmNil) -> macro_expand(ScmPair(ScmSymbol("let"), ScmPair(ScmPair(rib1 , ScmNil), body)))
+| ScmPair(rib1, rest) -> macro_expand(ScmPair(ScmSymbol("let"), ScmPair(ScmPair(rib1, ScmNil), ScmPair (ScmPair (ScmSymbol "let*", ScmPair (rest, body)), ScmNil))))
+| _ -> ScmNil
+
+and macro_expansion_letrec ribs body =
+match ribs with
+(* | ScmNil -> macro_expand(ScmPair(ScmSymbol "let",ScmPair(ScmNil, ScmPair(ScmPair(ScmSymbol "let", ScmPair(ScmNil, body)), ScmNil)))) *)
+| ScmNil -> macro_expand(ScmPair(ScmSymbol "let", ScmPair(ScmNil, ScmPair (body, ScmNil))))
+(* | ScmNil -> macro_expand(ScmPair(ScmSymbol "let",ScmPair(ScmNil, ScmPair(ScmPair(ScmSymbol "let", ScmPair(ScmNil, ScmPair(body, ScmNil))), ScmNil)))) *)
+| ScmPair(rib1, rest) -> ScmNil
+
+and macro_expansion_quasiquote exp =
+match exp with
+| ScmPair(ScmSymbol("unquote"), ScmPair(exp, ScmNil)) -> exp
+
+
 end;; 

@@ -85,6 +85,24 @@
 	mov qword [%1+TYPE_SIZE], %2
 %endmacro
 
+;; ---------------- Added by me ----------------
+; %define MAKE_LITERAL_RATIONAL(val) MAKE_LITERAL T_INTEGER, dq val
+%define MAKE_LITERAL_FLOAT(val) MAKE_LITERAL T_FLOAT, dq val
+%define MAKE_NIL db T_NIL
+%define MAKE_VOID db T_VOID
+%define MAKE_BOOLEAN(val) MAKE_LITERAL T_BOOL, db val
+%define MAKE_LITERAL_CHAR(val) MAKE_LITERAL T_CHAR, db val
+%define MAKE_LITERAL_SYMBOL(val) MAKE_LITERAL T_SYMBOL, dq val
+; %define MAKE_INT(r,val) MAKE_LONG_VALUE r, val, T_INTEGER
+; %define MAKE_FLOAT(r,val) MAKE_LONG_VALUE r, val, T_FLOAT
+; %define MAKE_CHAR(r,val) MAKE_CHAR_VALUE r, val
+
+%macro MAKE_LITERAL 2
+	db %1
+	%2
+%endmacro
+;; ---------------------------------------------
+
 %define MAKE_FLOAT(r,val) MAKE_LONG_VALUE r, val, T_FLOAT
 %define MAKE_CHAR(r,val) MAKE_CHAR_VALUE r, val
 
@@ -109,6 +127,17 @@
 	pop rcx
 	sub %1, WORD_SIZE+TYPE_SIZE
 %endmacro
+
+;; ---------------- Added by me ----------------
+%macro MAKE_LITERAL_STRING 1+
+	db T_STRING
+	dq (%%end_str - %%str)
+%%str:
+	db %1
+%%end_str:
+%endmacro
+;; ---------------------------------------------
+
 
 ; Create a vector of length %2
 ; from array of elements in register %3
