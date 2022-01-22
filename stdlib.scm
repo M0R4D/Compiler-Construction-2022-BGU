@@ -20,19 +20,47 @@
 
 
 (define fold-left 
-  #;(Add your implementation here
-     Note: The file won't compile like this, beacuase your tag-parser requires define to have a second expression.
-     This is on purpose, so you don't compile the library without completing this implementation by mistake.))
+;   #;(Add your implementation here
+;      Note: The file won't compile like this, beacuase your tag-parser requires define to have a second expression.
+;      This is on purpose, so you don't compile the library without completing this implementation by mistake.))
+	 (let ((null? null?)
+        (car car)
+        (cdr cdr))
+    (letrec ((foldl (lambda (fun unit lst)
+                          (if (null? lst)
+                              unit
+                              (foldl fun (fun unit (car lst)) (cdr lst))))))
+                          foldl)))
 
 (define fold-right
-  #;(Add your implementation here
-     Note: The file won't compile like this, beacuase your tag-parser requires define to have a second expression.
-     This is on purpose, so you don't compile the library without completing this implementation by mistake.))
+;   #;(Add your implementation here
+;      Note: The file won't compile like this, beacuase your tag-parser requires define to have a second expression.
+;      This is on purpose, so you don't compile the library without completing this implementation by mistake.))
+	(let ((null? null?)
+			(car car)
+			(cdr cdr))
+		(letrec ((foldr (lambda (fun unit lst)
+							(if (null? lst)
+								unit
+								(fun (car lst)
+									(foldr fun unit (cdr lst)))))))
+							foldr)))
 
 (define cons*
-  #;(Add your implementation here
-     Note: The file won't compile like this, beacuase your tag-parser requires define to have a second expression.
-     This is on purpose, so you don't compile the library without completing this implementation by mistake.))
+;   #;(Add your implementation here
+;      Note: The file won't compile like this, beacuase your tag-parser requires define to have a second expression.
+;      This is on purpose, so you don't compile the library without completing this implementation by mistake.))
+  (lambda lst
+    (cons** lst))
+
+(define cons**
+  (lambda (lst)
+    (if (null? lst)
+        lst
+        (if (null? (cdr lst))
+            (car lst)
+            (cons (car lst) (cons** (cdr lst)))))))
+
 
 (define append
   (let ((null? null?)

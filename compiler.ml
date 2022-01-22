@@ -35,6 +35,7 @@ let make_prologue consts_tbl fvars_tbl =
     (* Additional rational numebr ops *)
     "numerator", "numerator"; "denominator", "denominator"; "gcd", "gcd";
     (* you can add yours here *)
+    "apply", "apply"; "car", "car"; "cdr", "cdr"; "cons", "cons"; "set-car!", "set_car"; "set-cdr!", "set_cdr";
   ] in
   let make_primitive_closure (prim, label) =
     (* This implementation assumes fvars are addressed by an offset from the label `fvar_tbl`.
@@ -71,6 +72,8 @@ const_tbl:
 %define SOB_NIL_ADDRESS const_tbl+" ^ (string_of_int (fst (List.assoc (ScmNil) consts_tbl))) ^ "
 %define SOB_FALSE_ADDRESS const_tbl+" ^ (string_of_int (fst (List.assoc (ScmBoolean false) consts_tbl))) ^ "
 %define SOB_TRUE_ADDRESS const_tbl+" ^ (string_of_int  (fst (List.assoc (ScmBoolean true) consts_tbl))) ^ "
+%define FVAR(i) [fvar_tbl+i*WORD_SIZE]
+
 
 global main
 section .text
