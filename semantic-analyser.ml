@@ -268,7 +268,7 @@ module Semantic_Analysis : SEMANTIC_ANALYSIS = struct
       | ScmApplicTP' (proc, args) -> ScmApplicTP' ((change_set_get elemnt proc) , List.map (fun arg -> (change_set_get elemnt arg)) args)
       | _ -> expr
          
-    in recursion_box e;;
+    in recursion_box expr;;
 
   let run_semantics expr =
     box_set

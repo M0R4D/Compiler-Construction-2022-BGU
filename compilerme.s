@@ -202,50 +202,6 @@
 	add rsp, 8
 %endmacro
 	
-
-%macro SHIFT_FRAME 1
-	push rax              ; save rax
-	mov rax, PARAM_COUNT
-	add rax, 5            ; now rax hold the size of the old frame (no.params + 5 (4+magic))
-	mov r13, %1
-	sub r13, rax
-%assign i 1     
-%rep %1
-	dec rax
-	mov r15, [rbp-WORD_SIZE*i]
-	mov [rbp+WORD_SIZE*rax], r15  ; shift the frame downwards, put the end of the new frame at the end of the old frame and so on
-%assign i i+1
-%endrep
-	pop rax               ; return rax
-	shl r13, 3            ; r13 = (m-n)*8
-	mov r14, rbp
-	sub r14, r13
-	mov rsp, r14
-
-%endmacro
-
-%macro SHIFT_FRAME_APPLY 2
-	push rax              ; save rax
-	mov rax, PARAM_COUNT
-	add rax, 5            ; now rax hold the size of the old frame (no.params + 5 (4+magic))
-	mov r13, %1
-	sub r13, rax
-%assign i %0     
-%rep i
-	dec rax
-	mov r15, [rbp-WORD_SIZE*i]
-	mov [rbp+WORD_SIZE*rax], r15  ; shift the frame downwards, put the end of the new frame at the end of the old frame and so on
-%assign i i+1
-%endrep
-	pop rax               ; return rax
-	shl r13, 3            ; r13 = (m-n)*8
-	mov r14, rbp
-	sub r14, r13
-	mov rsp, r14
-
-%endmacro
-%define PARAM_COUNT qword [rbp+3*WORD_SIZE]
-
 ; Creates a short SOB with the
 ; value %2
 ; Returns the result in register %1
@@ -263,6 +219,60 @@
 	mov byte [%1], %3
 	mov qword [%1+TYPE_SIZE], %2
 %endmacro
+
+;; ---------------- Added by me ----------------
+; %define MAKE_LITERAL_RATIONAL(val) MAKE_LITERAL T_INTEGER, dq val
+%define MAKE_LITERAL_FLOAT(val) MAKE_LITERAL T_FLOAT, dq val
+%define MAKE_NIL db T_NIL
+%define MAKE_VOID db T_VOID
+%define MAKE_BOOLEAN(val) MAKE_LITERAL T_BOOL, db val
+%define MAKE_LITERAL_CHAR(val) MAKE_LITERAL T_CHAR, db val
+%define MAKE_LITERAL_SYMBOL(val) MAKE_LITERAL T_SYMBOL, dq val
+; %define MAKE_INT(r,val) MAKE_LONG_VALUE r, val, T_INTEGER
+; %define MAKE_FLOAT(r,val) MAKE_LONG_VALUE r, val, T_FLOAT
+; %define MAKE_CHAR(r,val) MAKE_CHAR_VALUE r, val
+
+%macro MAKE_LITERAL 2
+	db %1
+	%2
+%endmacro
+;; ---------------------------------------------
+
+%define MAKE_FLOAT(r,val) MAKE_LONG_VALUE r, val, T_FLOAT
+%define MAKE_CHAR(r,val) MAKE_CHAR_VALUE r, val
+
+; Create a string of length %2
+; from char %3.
+; Stores result in register %1
+%macro MAKE_STRING 3
+	lea %1, [%2+WORD_SIZE+TYPE_SIZE]
+	MALLOC %1, %1
+	mov byte [%1], T_STRING
+	mov qword [%1+TYPE_SIZE], %2
+	push rcx
+	add %1,WORD_SIZE+TYPE_SIZE
+	mov rcx, %2
+	cmp rcx, 0
+%%str_loop:
+	jz %%str_loop_end
+	dec rcx
+	mov byte [%1+rcx], %3
+	jmp %%str_loop
+%%str_loop_end:
+	pop rcx
+	sub %1, WORD_SIZE+TYPE_SIZE
+%endmacro
+
+;; ---------------- Added by me ----------------
+%macro MAKE_LITERAL_STRING 1+
+	db T_STRING
+	dq (%%end_str - %%str)
+%%str:
+	db %1
+%%end_str:
+%endmacro
+;; ---------------------------------------------
+
 
 ; Create a vector of length %2
 ; from array of elements in register %3
@@ -303,82 +313,11 @@
         mov qword [%1+TYPE_SIZE+WORD_SIZE], %4
 %endmacro
 
-%macro MAKE_STRING 3 ; Create a string of length %2
-	; from char %3.
-	; Stores result in register %1
-	mov %1, %2
-	MALLOC %1, %1
-	mov byte [%1], T_STRING
-	mov qword [%1+TYPE_SIZE], %2
-	push rcx
-	add %1, WORD_SIZE+TYPE_SIZE
-	mov rcx, %2
-	cmp rcx, 0
-	%%str_loop:
-		jz %%str_loop_end
-		dec rcx
-		mov byte [%1+rcx], %3
-		jmp %%str_loop
-	%%str_loop_end:
-		pop rcx
-		sub %1, WORD_SIZE+TYPE_SIZE
-%endmacro
-
-%macro MAKE_LITERAL_STRING 2
-	db T_STRING
-	dq %1
-	db %2
-%endmacro
-
-%macro MAKE_LITERAL 2 ; Make a literal of type %1
-; followed by the definition %2
-db %1
-%2
-%endmacro
-%define MAKE_LITERAL_INT(val) MAKE_LITERAL T_INTEGER, dq val
-%define MAKE_LITERAL_FLOAT(val) MAKE_LITERAL T_FLOAT, dq val
-%define MAKE_LITERAL_CHAR(val) MAKE_LITERAL T_CHAR, db val
-%define MAKE_NIL db T_NIL
-%define MAKE_VOID db T_VOID
-%define MAKE_BOOLEAN(val) MAKE_LITERAL T_BOOL, db val
-%define MAKE_INT(r, val) MAKE_LONG_VALUE r, val, T_INTEGER
-%define MAKE_FLOAT(r, val) MAKE_LONG_VALUE r, val, T_FLOAT
-%define MAKE_CHAR(r, val) MAKE_CHAR_VALUE r, val
 %macro MAKE_WORDS_LIT 3
 	db %1
-	dq %2
-	dq %3
+        dq %2
+        dq %3
 %endmacro
-
-%define MAKE_PAIR(r, car, cdr) \
-MAKE_TWO_WORDS r, T_PAIR, car, cdr
-%define MAKE_LITERAL_PAIR(car, cdr) \
-MAKE_WORDS_LIT T_PAIR, car, cdr
-%define MAKE_CLOSURE(r, env, body) \
-MAKE_TWO_WORDS r, T_CLOSURE, env, body
-%define MAKE_LITERAL_CLOSURE(body) \
-MAKE_WORDS_LIT T_CLOSURE, 0, body
-%define MAKE_LITERAL_SYMBOL(val) MAKE_LITERAL T_SYMBOL, dq val
-%define FVAR(i) [fvar_tbl+i]
-
-%macro CHECK_MAGIC 1
-	mov %1, qword [rbp+8*3]
-	add %1, 4
-	shl %1, 3
-	add %1, rbp
-	mov %1, qword [%1]
-	cmp %1, SOB_NIL_ADDRESS
-%endmacro
-
-%macro MAKE_LITERAL_VECTOR 0-*
-	db T_VECTOR
-	dq %0
-	%rep %0
-		dq %1
-		%rotate 1
-	%endrep
-%endmacro
-
 
 %define MAKE_RATIONAL(r, num, den) \
 	MAKE_TWO_WORDS r, T_RATIONAL, num, den
@@ -386,6 +325,15 @@ MAKE_WORDS_LIT T_CLOSURE, 0, body
 %define MAKE_LITERAL_RATIONAL(num, den) \
 	MAKE_WORDS_LIT T_RATIONAL, num, den
 	
+%define MAKE_PAIR(r, car, cdr) \
+        MAKE_TWO_WORDS r, T_PAIR, car, cdr
+
+%define MAKE_LITERAL_PAIR(car, cdr) \
+        MAKE_WORDS_LIT T_PAIR, car, cdr
+
+%define MAKE_CLOSURE(r, env, body) \
+        MAKE_TWO_WORDS r, T_CLOSURE, env, body
+
 	
 ;;; Macros and routines for printing Scheme OBjects to STDOUT
 %define CHAR_NUL 0
@@ -964,7 +912,7 @@ section .data
 	dq write_sob_closure, write_sob_pair, write_sob_vector
 
 section .text
-write_sob_if_not_void: 
+write_sob_if_not_void:
 	mov rsi, rax
 	mov bl, byte [rsi]
 	cmp bl, T_VOID

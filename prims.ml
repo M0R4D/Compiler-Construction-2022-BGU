@@ -367,84 +367,11 @@ module Prims : PRIMS = struct
          (  "mov [rsi + TYPE_SIZE + WORD_SIZE], rdi
             mov rax, SOB_VOID_ADDRESS
             ", make_binary, "set_cdr");
-            
-         ("mov rbx, [rsp + 8 * 3]
- mov rax, PVAR((rbx - 1)); k
- PAIR_LENGTH   ;rax is the length
- mov rbx, [rsp + 8 * 3] ;n
- 
- cmp rax, 0
- je .equals
- .notequals:
- .dealwithrest:
-    lea rcx, [rax-1]
-    mov rdx, 0
-    lea rsi, [rbx + 3] 
-    .restloop:
-    cmp rsi, 0
-    je .dealwithlist
-    mov rax, [rsp + 8 * (rdx)]
-    mov rbx, rdx
-    sub rbx, rcx
-    mov [rsp + 8 * (rbx)], rax
-    inc rdx
-    dec rsi
-    jmp .restloop
- .dealwithlist:
-    lea rax, [8* rcx]
-    sub rsp, rax
-    mov rax, [rsp + 8 * 3]
-    lea rbx, [rsp+8*(3+rax)]
-    add rax, rcx
-    mov [rsp + 8 * 3], rax
-    mov rax, [rsp + 8 * (3 + rax)]  ;;RAX WILL ALWAYS POINT AT THE CURRENT PAIR
- .listloop:
-    cmp rax, SOB_NIL_ADDRESS
-    je .callthefunc
-    CAR rcx, rax
-    CDR rax, rax
-    mov [rbx], rcx
-    add rbx, 8
-    jmp .listloop
- .equals:
- mov rbx, [rsp + 8 * 3]
- add rbx, 2
- .eloop:
-        mov rcx ,[rsp + 8 *(rbx)]
-        mov [rsp + 8 *(rbx+1)], rcx
-        cmp rbx, 0
-        je .eend
-        dec rbx
-        jmp .eloop
- .eend:
- pop rbx
- sub qword [rsp + 8 * 3], 1
- 
- .callthefunc:
-    mov rax, [rsp + 8 * 4]
-    mov rbx, [rsp + 8*3]
-    mov [rsp + 8*4], rbx
-    mov rbx, [rsp + 8*2]
-    mov [rsp + 8*3], rbx
-    mov rbx, [rsp + 8*1]
-    mov [rsp + 8*2], rbx
-    mov rbx, [rsp + 8*0]
-    mov [rsp + 8*1], rbx
-    add rsp, 8
-    sub qword[rsp +8*3], 1
-    CLOSURE_ENV rbx, rax
-    mov [rsp + 8*2], rbx
-    CLOSURE_CODE rbx, rax
-    pop rbp
-    jmp rbx
-         "
-         
-         , make_unary , "apply";);
       ] in
     String.concat "\n\n" (List.map (fun (a, b, c) -> (b c a)) misc_parts);;
-
+    
   (* This is the interface of the module. It constructs a large x86 64-bit string using the routines
      defined above. The main compiler pipline code (in compiler.ml) calls into this module to get the
      string of primitive procedures. *)
-  let procs = String.concat "\n\n" [type_queries ; numeric_ops; misc_ops];;
+  let procs = String.concat "\n\n" [type_queries ; numeric_ops; misc_ops;];;
 end;;

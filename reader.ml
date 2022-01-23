@@ -25,6 +25,10 @@ type sexpr =
   | ScmVector of (sexpr list)
   | ScmPair of (sexpr * sexpr);;
 
+type standart_or_interpolated =
+  |Static of string
+  |Dynamic of sexpr
+
 module type READER = sig
     val nt_sexpr : sexpr PC.parser
 end;; (* end of READER signature *)
@@ -51,7 +55,7 @@ and nt_paired_comment str =
   let nt2 = disj nt1 (unitify (one_of "{}")) in 
   let nt3 = diff (unitify nt_any) nt2 in
   let nt4 = star (disj nt3 nt1) in
-  let nt5 = unitify (caten (char '{') (caten nt3 (char '}'))) in
+  let nt5 = unitify (caten (char '{') (caten nt4 (char '}'))) in
   nt5 str
 
 and nt_sexpr_comment str = 

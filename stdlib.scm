@@ -50,24 +50,12 @@
 ;   #;(Add your implementation here
 ;      Note: The file won't compile like this, beacuase your tag-parser requires define to have a second expression.
 ;      This is on purpose, so you don't compile the library without completing this implementation by mistake.))
-  (lambda lst
-    (cons** lst))
-
-(define cons**
-  (lambda (lst)
-    (if (null? lst)
-        lst
-        (if (null? (cdr lst))
-            (car lst)
-            (cons (car lst) (cons** (cdr lst)))))))
-; (define cons*
-;   (letrec ((last_element (lambda (l)
-;    (if (null? (cdr l))
-;        (car l)
-;        (last_element (cdr l)))))) (lambda x
-;      (fold-left cons (last_element x) (cdr (fold-left cons '() x))))))
-
-
+  (letrec ((last_element (lambda (l)
+   (if (null? (cdr l))
+       (car l)
+       (last_element (cdr l)))))) (lambda x
+     (fold-left cons (last_element x) (cdr (fold-left cons '() x))))))
+	 
 
 (define append
   (let ((null? null?)

@@ -1,3 +1,4 @@
 # ignore others folder
 others/*
 .DS_Store
+.Trash-1001/*
