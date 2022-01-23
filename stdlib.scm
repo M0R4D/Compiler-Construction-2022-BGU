@@ -60,6 +60,13 @@
         (if (null? (cdr lst))
             (car lst)
             (cons (car lst) (cons** (cdr lst)))))))
+; (define cons*
+;   (letrec ((last_element (lambda (l)
+;    (if (null? (cdr l))
+;        (car l)
+;        (last_element (cdr l)))))) (lambda x
+;      (fold-left cons (last_element x) (cdr (fold-left cons '() x))))))
+
 
 
 (define append

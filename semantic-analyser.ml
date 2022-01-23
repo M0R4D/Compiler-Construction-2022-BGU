@@ -155,7 +155,120 @@ module Semantic_Analysis : SEMANTIC_ANALYSIS = struct
   let find_reads name enclosing_lambda expr = raise X_not_yet_implemented 
 
 
-  let rec box_set expr = raise X_not_yet_implemented
+  let rec box_set expr = 
+    let rec recursion_box e = 
+      match e with 
+      | ScmBoxSet' (var, exp) -> ScmBoxSet' (var, recursion_box exp)
+      | ScmIf'(test, dit, dif)-> ScmIf'(recursion_box test, recursion_box dit, recursion_box dif) 
+      | ScmSeq' e_list -> ScmSeq' (List.map (fun exp -> recursion_box exp) e_list)
+      | ScmSet' (v, exp) -> ScmSet' (v, recursion_box exp)
+      | ScmDef' (v, exp) -> ScmDef' (v, recursion_box exp)
+      | ScmOr' e_list -> ScmOr' (List.map (fun exp -> recursion_box exp) e_list)
+      | ScmLambdaSimple' (elemnt, expr)  -> ScmLambdaSimple'(elemnt, remove_sequence (recursion_box (box_as elemnt expr [])))
+      | ScmLambdaOpt' (elemnt, el_opt, expr) -> ScmLambdaOpt'(elemnt,el_opt, remove_sequence (recursion_box (box_as (elemnt@[el_opt]) expr [])))
+      | ScmApplic' (proc, args) -> ScmApplic' (recursion_box proc, List.map (fun arg -> recursion_box arg) args)
+      | ScmApplicTP' (proc, args) -> ScmApplicTP' (recursion_box proc, List.map (fun arg -> recursion_box arg) args)
+      | _ -> e
+         
+    and elemnts_boxed expr e_to_box = 
+      let n_exp = e_get_set e_to_box expr in
+      let setsList = List.map (fun param -> e_to_add param expr) e_to_box in
+      ScmSeq' (setsList@[recursion_box n_exp])
+
+    and remove_sequence exp = 
+    match exp with
+    | ScmSeq' [e] -> e 
+    |  _ -> exp  
+       
+  and e_get_set e_to_box expr  = 
+    match e_to_box with
+  | [] -> expr
+  | car::cdr -> let expr_new = change_set_get car expr in e_get_set cdr expr_new 
+     
+  and box_no_box param expr = let (exp1,exp2,exp3) = look_out param expr (false,false,false) in
+           (exp1 && exp2 && exp3)
+
+    and box_as elemnt expr e_to_box = 
+      match elemnt with
+      | [] -> (elemnts_boxed expr e_to_box) 
+      | car::cdr -> let is_e_box = box_no_box car expr in box_as cdr expr (if is_e_box  then (e_to_box@[car]) else e_to_box) 
+                          
+
+  
+    and look_out elemnt e (exp1,exp2,exp3) = 
+      match e with
+      | ScmSet' (VarBound (par, _, _), exp) -> if par = elemnt then look_out elemnt exp (true,true,exp3) else look_out elemnt exp (exp1,exp2,exp3) 
+      | ScmSet' (VarParam (par, _), exp) -> if par = elemnt then look_out elemnt exp (exp1,true,exp3) else look_out elemnt exp (exp1,exp2,exp3)(* set*)
+      | ScmVar' (VarBound (par, _, _)) -> if par = elemnt then (true,exp2,true) else (exp1,exp2,exp3) 
+      | ScmVar' (VarParam (par, _)) -> if par = elemnt then (exp1,exp2,true) else (exp1,exp2,exp3)  
+      | ScmBoxSet' (_,exp) -> look_out elemnt exp (exp1,exp2,exp3)
+      | ScmIf'(test, dit, dif)-> check_exp elemnt (test::dit::dif::[]) (exp1,exp2,exp3)
+      | ScmSeq' se_list -> check_exp elemnt se_list (exp1,exp2,exp3)
+      | ScmSet' (v, exp) -> look_out elemnt exp (exp1,exp2,exp3)
+      | ScmDef' (v, exp) -> look_out elemnt exp (exp1,exp2,exp3)
+      | ScmOr' e_list -> check_exp elemnt e_list (exp1,exp2,exp3)
+      | ScmLambdaSimple' (e, exp)  ->  if List.mem elemnt e then (false,false,false) else look_out elemnt exp (exp1,exp2,exp3)
+      | ScmLambdaOpt' (e, el_opt,exp) -> if List.mem elemnt e || List.mem elemnt [el_opt] then (false,false,false) else look_out elemnt exp (exp1,exp2,exp3)
+      | ScmApplic' (proc, args) -> check_exp elemnt (proc::args) (exp1,exp2,exp3)
+      | ScmApplicTP' (proc, args) ->  check_exp elemnt (proc::args) (exp1,exp2,exp3)
+      | _ -> (exp1,exp2,exp3)
+        
+      
+      and  max_in_list l x = 
+      match l with
+      | [] -> x
+      | car::cdr -> let m = Pervasives.max x car in max_in_list cdr m
+
+    and check_exp elemnt e_list (exp1,exp2,exp3) = 
+      match e_list with
+      | [] -> (exp1,exp2,exp3)
+      | (car::cdr) -> let (n_exp1,n_exp2,n_exp3) = look_out elemnt car (exp1,exp2,exp3) in check_exp elemnt cdr (n_exp1,n_exp2,n_exp3)
+  
+                  
+  and minor_to_apdate_set elemnt e = 
+      match e with
+      | ScmSet' (VarBound (p, _, min_index), _) -> if p = elemnt then min_index else (-1)
+      | ScmSet' (VarParam (p, min_index), _) -> if p = elemnt then min_index else (-1)
+      | ScmVar' (VarBound (p, _, min_index)) -> if p = elemnt then min_index else (-1)
+      | ScmVar' (VarParam (p, min_index)) ->  if p = elemnt then min_index else (-1)
+      | ScmBox' (VarParam (p, min_index)) -> if p = elemnt then min_index else (-1)
+      | ScmBoxGet' bGet -> minor_to_apdate_set elemnt (ScmVar' bGet)
+      | ScmBoxSet' (bSet,exp) -> max_in_list [(minor_to_apdate_set elemnt (ScmVar' bSet)) ; (minor_to_apdate_set elemnt exp)] (-1) 
+      | ScmIf'(test, dit, dif)-> max_in_list [(minor_to_apdate_set elemnt test) ; (minor_to_apdate_set elemnt dit) ; (minor_to_apdate_set elemnt dif)] (-1)
+      | ScmSeq' se_list -> max_in_list (List.map (fun exp -> minor_to_apdate_set elemnt exp) se_list) (-1)
+      | ScmSet' (v, exp) -> max_in_list [(minor_to_apdate_set elemnt (ScmVar' v)) ; (minor_to_apdate_set elemnt exp)] (-1)
+      | ScmDef' (v, exp) -> max_in_list [(minor_to_apdate_set elemnt (ScmVar' v)) ; (minor_to_apdate_set elemnt exp)] (-1)
+      | ScmOr' e_list -> max_in_list (List.map (fun exp -> minor_to_apdate_set elemnt exp) e_list) (-1)
+      | ScmLambdaSimple' (e, exp)  -> minor_to_apdate_set elemnt exp
+      | ScmLambdaOpt' (e, el_opt,exp) -> minor_to_apdate_set elemnt exp
+      | ScmApplic' (proc, args) |ScmApplicTP' (proc, args) -> max_in_list ((minor_to_apdate_set elemnt proc)::(List.map (fun arg -> minor_to_apdate_set elemnt arg) args)) (-1)
+      | _ -> -1
+          
+    and e_to_add elemnt expr= 
+      let minor = minor_to_apdate_set elemnt expr in
+      let varParam = (VarParam (elemnt, minor)) in
+      let add = ScmSet' (varParam, (ScmBox' varParam)) in
+      add
+  
+  
+    and change_set_get elemnt expr =  
+      match expr with 
+      | ScmSet' (VarBound (p, major_index, min_index), exp) -> if p = elemnt then ScmBoxSet' ((VarBound (p, major_index, min_index)), (change_set_get elemnt exp)) else ScmSet' (VarBound (p, major_index, min_index), (change_set_get elemnt exp))
+      | ScmSet' (VarParam (p, min_index), exp) ->  if p = elemnt then ScmBoxSet' ((VarParam (p, min_index)), (change_set_get elemnt exp)) else ScmSet' ((VarParam (p, min_index)), (change_set_get elemnt exp))
+      | ScmVar' (VarBound (p, major_index, min_index)) -> if p = elemnt then ScmBoxGet' (VarBound (p, major_index, min_index)) else expr
+      | ScmVar' (VarParam (p, min_index)) -> if p = elemnt then ScmBoxGet' (VarParam (p, min_index)) else expr
+      | ScmBoxSet' (v,exp) -> ScmBoxSet' (v ,(change_set_get elemnt exp)) 
+      | ScmIf'(test, dit, dif)-> ScmIf' ((change_set_get elemnt test), (change_set_get elemnt dit), (change_set_get elemnt dif))
+      | ScmSeq' se_list -> ScmSeq' (List.map (fun exp -> (change_set_get elemnt exp)) se_list)
+      | ScmDef' (v, exp) -> ScmDef' (v, (change_set_get elemnt exp))
+      | ScmOr' e_list -> ScmOr' (List.map (fun exp -> change_set_get elemnt exp) e_list)
+      | ScmLambdaSimple' (e, exps)  -> if List.mem elemnt e then ScmLambdaSimple' (e, exps) else ScmLambdaSimple' (e, change_set_get elemnt exps)
+      | ScmLambdaOpt' (e, el_opt,exps) -> if List.mem elemnt e || List.mem elemnt [el_opt] then ScmLambdaOpt' (e, el_opt, exps) else ScmLambdaOpt' (e, el_opt, change_set_get elemnt exps)
+      | ScmApplic' (proc, args) -> ScmApplic' ((change_set_get elemnt proc) , List.map (fun arg -> (change_set_get elemnt arg)) args)
+      | ScmApplicTP' (proc, args) -> ScmApplicTP' ((change_set_get elemnt proc) , List.map (fun arg -> (change_set_get elemnt arg)) args)
+      | _ -> expr
+         
+    in recursion_box e;;
 
   let run_semantics expr =
     box_set

@@ -359,13 +359,12 @@ module Prims : PRIMS = struct
          "MAKE_PAIR(rax, rsi, rdi)", make_binary, "cons"; 
 
          (* set-car! *)
-         ("", , "cons");
-         (  "mov [rsi+1], rdi
+         ( "mov [rsi + TYPE_SIZE], rdi
             mov rax, SOB_VOID_ADDRESS
             ", make_binary, "set_car");
 
          (* set-cdr! *)
-         (  "mov [rsi+9], rdi
+         (  "mov [rsi + TYPE_SIZE + WORD_SIZE], rdi
             mov rax, SOB_VOID_ADDRESS
             ", make_binary, "set_cdr");
             
