@@ -193,7 +193,7 @@ let rec tag_parse_expression sexpr =
 (* Strins *)
   | ScmString(str) -> ScmConst (ScmString str)
 (* Qouted Expressions *)
-  | ScmPair(ScmSymbol("quote"), ScmPair(sexpr, ScmNil)) -> ScmConst sexpr
+  | ((ScmPair(ScmSymbol("quote"), ScmPair(x, ScmNil)))) -> ScmConst x
 
 (* Variables *)
   | ScmSymbol(symbol) -> if (List.mem symbol reserved_word_list) then 
@@ -235,9 +235,6 @@ let rec tag_parse_expression sexpr =
   | ScmPair(ScmSymbol("begin"), ScmNil) -> ScmConst (ScmVoid) (* begin without any expressions *)
   | ScmPair(ScmSymbol("begin"), ScmPair(exp1, ScmNil)) -> tag_parse_expression exp1 (* begin with one expression *)
   | ScmPair(ScmSymbol("begin"), body) -> ScmSeq(List.map (fun e -> tag_parse_expression e) (scm_list_to_list body)) (* begin with multiple expressions *)
-
-(* Special Forms: quasiqoute, and, cond, let, let*, letrec *)
-
 
 (* Applications *)
   | ScmPair(ScmSymbol(name), ScmNil) -> ScmApplic (ScmVar name, []) 
@@ -290,7 +287,7 @@ and macro_expand sexpr =
 (* Expansion for: cond *)
   | ScmPair(ScmSymbol("cond"), ScmPair(ribs, body)) -> macro_expansion_cond ribs body
 
-(* Expansion for QuasiQoutes: quasiqoute, unqoute, unqoute-splicing *)
+(* Expansion for QuasiQuotes: quasiquote, unquote, unquote-splicing *)
   | ScmPair(ScmSymbol("quasiquote"), ScmPair(exp, ScmNil)) -> macro_expansion_quasiquote exp
 
   | _ -> sexpr

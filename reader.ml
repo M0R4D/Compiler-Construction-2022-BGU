@@ -386,7 +386,7 @@ and nt_quoted_forms str =
                   nt_unquote;
                   nt_unquote_and_splice]) 
       (fun (quote_type, sexp) -> match quote_type with
-         |['\''] -> form "qoute" sexp
+         |['\''] -> form "quote" sexp
          |['`'] -> form "quasiquote" sexp
          |[','] -> form "unquote" sexp
          |[',';'@'] -> form "unquote-splicing" sexp

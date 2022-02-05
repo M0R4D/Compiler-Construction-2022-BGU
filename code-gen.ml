@@ -1,6 +1,7 @@
 #use "semantic-analyser.ml";;
 
 exception X_not_recognized_expression of expr'
+exception X_not_defined_variable of string
 
 (* This module is here for you convenience only!
    You are not required to use it.
@@ -35,13 +36,13 @@ end;;
 
 module Code_Gen : CODE_GEN = struct
 
-  let primitives = [  "+"; "*" ; "-"; "/"; 
-                      "<"; "="; ">"; "eq?"; "equal?"; "not"; 
-                      "zero?"; "boolean?"; "char?"; "integer?"; "list?"; "null?"; "pair?"; "procedure?"; "rational?"; "number?"; "flonum?"; "string?";
-                      "append"; "apply"; "map"; "fold-right";"fold-left";
-                      "car"; "cdr"; "length"; "list"; "cons"; "cons*";"set-car!"; "set-cdr!";
-                      "char->integer";"numerator"; "denominator"; "gcd"; "integer->char"; "exact->inexact"; 
-                      "make-string"; "string->list"; "string-length"; "string-ref"; "string-set!"; "symbol"; "symbol->string" ];;
+  let primitives = ["car"; "cdr"; "cons" ; "set-car!"; "set-cdr!"; "apply"; "boolean?";"flonum?";
+    "rational?"; "pair?"; "null?"; "char?"; "string?" ; "symbol?"; "procedure?";
+    "map"; "fold-left"; "fold-right"; "cons*"; "append"; "list"; "list?";
+    "not"; "-"; ">"; "gcd"; "zero?"; "integer?"; "number?"; "length"; "string->list"; "equal?";
+    "string-ref"; "string-set!";  "make-string"; "symbol->string";
+    "char->integer"; "integer->char"; "exact->inexact"; "eq?";
+    "+"; "*"; "/"; "="; "<"; "numerator"; "denominator"; "gcd"; "string-length"];;
 
   let count = ref 1;;
 
@@ -105,12 +106,12 @@ module Code_Gen : CODE_GEN = struct
           | ScmBoolean(false) -> run tl (index + 2) (table @ [ScmBoolean(false), (index, "MAKE_BOOLEAN(0)")])
           | ScmBoolean(true) -> run tl (index + 2) (table @ [ScmBoolean(true), (index, "MAKE_BOOLEAN(1)")])
           | ScmChar(c) -> run tl (index + 2) (table @ [ScmChar(c), (index, "MAKE_LITERAL_CHAR(" ^ string_of_int(int_of_char c) ^ ")" )])
-          | ScmNumber(ScmRational(n, d)) -> run tl (index + 9) (table @ [ScmNumber(ScmRational(n,d)), (index, "MAKE_LITERAL_RATIONAL(" ^ string_of_int n ^ ", " ^ string_of_int d ^ ")" )])
-          | ScmNumber(ScmReal(r)) -> run tl (index + 1) (table @ [ScmNumber(ScmReal(r)), (index, "MAKE_LITERAL_FLOAT(" ^ (string_of_float r) ^ ")")])
-          | ScmString(s) -> run tl (index + 1 + 8 + (String.length s)) (table @ [ScmString(s), (index, "MAKE_LITERAL_STRING "^(string_of_int(String.length s))^",\" "^ s ^ "\"")])
-          | ScmSymbol(s) -> run tl (index + 1 + 8) (table @ [ScmSymbol(s), (index, "MAKE_LITERAL_SYMBOL(" ^ string_of_int(find_const_index_in_table table (ScmString s)) ^ ")" )])
+          | ScmNumber(ScmRational(n, d)) -> run tl (index + 1 + 8 + 8) (table @ [ScmNumber(ScmRational(n,d)), (index, "MAKE_LITERAL_RATIONAL(" ^ string_of_int n ^ "," ^ string_of_int d ^ ")" )])
+          | ScmNumber(ScmReal(r)) -> run tl (index + 1 + 8) (table @ [ScmNumber(ScmReal(r)), (index, "MAKE_LITERAL_FLOAT(" ^ (string_of_float r) ^ ")")])
+          | ScmString(s) -> run tl (index + 1 + 8 + (String.length s)) (table @ [ScmString(s), (index, "MAKE_LITERAL_STRING \"" ^ s ^ "\"")])
+          | ScmSymbol(s) -> run tl (index + 1 + 8) (table @ [ScmSymbol(s), (index, "MAKE_LITERAL_SYMBOL(const_tbl + " ^ string_of_int(find_const_index_in_table table (ScmString s)) ^ ")" )])
           | ScmVector(v) -> run tl (index + 1 + 8 + (List.length v)) (table @ [ScmVector(v), (index, "")])
-          | ScmPair(car, cdr) -> run tl (index + 1 + 8 + 8) (table @ [ScmPair(car, cdr), (index, "MAKE_LITERAL_PAIR(consts_tbl + " ^ string_of_int(find_const_index_in_table table car) ^ ", consts_tbl + " ^ string_of_int(find_const_index_in_table table cdr) ^ ")" )])
+          | ScmPair(car, cdr) -> run tl (index + 1 + 8 + 8) (table @ [ScmPair(car, cdr), (index, "MAKE_LITERAL_PAIR(const_tbl + " ^ string_of_int(find_const_index_in_table table car) ^ ", const_tbl + " ^ string_of_int(find_const_index_in_table table cdr) ^ ")" )])
         ) 
     in 
     run ([ScmNil; ScmVoid; ScmBoolean(false); ScmBoolean(true)] @ expanded_consts_lst) 0 [];; 
@@ -150,11 +151,12 @@ module Code_Gen : CODE_GEN = struct
   (* fvars_lst example: ["+"; "car"; "cdr"; "length"; ... ; "foo"] *)
     match fvars_lst with
     | [] -> []
-    | (hd :: tl) -> (hd , index) :: create_fvars_table tl (index + 1);;
+    | (hd :: tl) -> (hd , index) :: create_fvars_table tl (index + 8);;
 
   let rec find_fvar_in_fvars_table fvars_tbl fvar = 
     match fvars_tbl with
-    | [] -> -1
+    (* | [] -> -1 *)
+    | [] -> raise (X_not_defined_variable fvar)
     | (hd :: tl) ->  (
         match hd with
         | (var, index) -> if (var = fvar) then index else find_fvar_in_fvars_table tl fvar 
@@ -206,7 +208,7 @@ module Code_Gen : CODE_GEN = struct
   (* Sequences *)
     | ScmSeq'(seq) -> (List.fold_left(fun acc expr-> acc ^ (generate_helper consts fvars env expr) ^ "\n") "" seq)
   (* Or *)
-    | ScmOr'(exprs) ->let c = inc_and_update count in
+    | ScmOr'(exprs) -> let c = inc_and_update count in
                  generate_or consts fvars env exprs c ^ "\n"
   (* If *)
     | ScmIf'(test, dit, dif) -> let c = inc_and_update count in
@@ -218,7 +220,12 @@ module Code_Gen : CODE_GEN = struct
                               Lelse" ^ string_of_int c ^ ":\n" ^ 
         generate_helper consts fvars env dif ^ "Lexit" ^ string_of_int c ^ ":\n"
   (* Boxes: ScmBoxGet' and ScmBoxSet' *)
-    | ScmBox'(VarParam( _ , minor)) -> 
+    | ScmBox'(VarParam( _ , minor)) -> "; Sexpression: Boxing\n" ^ 
+    "mov rax, qword[rbp + 8 * (4 + " ^ string_of_int minor ^ ")]\n" ^ "push SOB_NIL_ADDRESS\n" ^ 
+    "push rax\n" ^ "push 2\n" ^ "push SOB_NIL_ADDRESS\n" ^ "call cons\n" ^ 
+    "add rsp,8*1\n" ^ "pop rbx\n" ^ "shl rbx,3\n" ^ "add rsp,rbx\n" ^
+    "mov qword[rbp + 8 * (4 + " ^ string_of_int minor ^ ")],rax\n"
+    (* | ScmBox'(VarParam( _ , minor)) -> 
                                     ";box to string\nmov rax, qword[rbp + 8 * (4 + " ^ string_of_int minor ^ ")]\n" ^
                                     "push SOB_NIL_ADDRESS ; something for the cdr\n" ^
                                     "push rax             ; car\n" ^
@@ -229,12 +236,20 @@ module Code_Gen : CODE_GEN = struct
                                     "pop rbx              ;pop argc\n" ^
                                     "shl rbx,3            ;rbx=rbx*8\n" ^
                                     "add rsp,rbx          ;pop args\n" ^
-                                    "mov qword[rbp + 8 * (4 + " ^ string_of_int minor ^ ")],rax\n"
-    | ScmBoxGet'(var) -> generate_helper consts fvars env (ScmVar'(var)) ^ "\nmov rax, qword[rax]\n"
-    | ScmBoxSet'(var, value) -> generate_helper consts fvars env value ^ "\npush rax\n" ^ 
+                                    "mov qword[rbp + 8 * (4 + " ^ string_of_int minor ^ ")],rax\n" *)
+    | ScmBoxGet'(var) -> generate_helper consts fvars env (ScmVar'(var)) ^ 
+    "push rax\n" ^ "push 1\n" ^ "push SOB_NIL_ADDRESS\n" ^ "call car\n" ^
+    "add rsp,8*1\n" ^ "pop rbx\n" ^ "shl rbx,3\n" ^ "add rsp, rbx\n" 
+    (* | ScmBoxGet'(var) -> generate_helper consts fvars env (ScmVar'(var)) ^ "\nmov rax, qword[rax]\n" *)
+    | ScmBoxSet'(var, value) -> generate_helper consts fvars env value ^ "push rax\n" ^
+    generate_helper consts fvars env (ScmVar'(var)) ^
+    "push rax\n" ^ "push 2\n" ^ "push SOB_NIL_ADDRESS\n" ^ "call setcar\n" ^
+    "add rsp, 8\n" ^ "pop rbx\n" ^ "shl rbx, 3\n" ^ "add rsp, rbx\n" ^ "mov rax,SOB_VOID_ADDRESS\n"
+  
+    (* | ScmBoxSet'(var, value) -> generate_helper consts fvars env value ^ "\npush rax\n" ^ 
                                 generate_helper consts fvars env (ScmVar'(var)) ^ 
                                 "\n pop qword[rax] \n
-                              mov rax, SOB_VOID_ADDRESS \n"
+                              mov rax, SOB_VOID_ADDRESS \n" *)
   (* Lambdas: ScmLambdaSimple' and ScmLambdaOpt' *)
     | ScmLambdaSimple'(args, body) -> let c = inc_and_update count in
                                       let lcode = "Lcode" ^ (string_of_int c) in 
@@ -250,7 +265,7 @@ module Code_Gen : CODE_GEN = struct
                                       "leave\n" ^
                                       "ret\n" ^
                                       lcont ^ ":\n"
-    | ScmLambdaOpt'(args, opt, body) ->  let c = inc_and_update count in
+    (* | ScmLambdaOpt'(args, opt, body) ->  let c = inc_and_update count in
                                           let lcode = "Lcode" ^ (string_of_int c) in 
                                           let lcont = "Lcont" ^ (string_of_int c) in
                                           let num_of_desired_args = (string_of_int ((List.length args) + 1)) in
@@ -265,7 +280,7 @@ module Code_Gen : CODE_GEN = struct
                                           generate_helper consts fvars (env + 1) body ^
                                           "leave\n" ^
                                           "ret\n" ^
-                                          lcont ^ ":\n"
+                                          lcont ^ ":\n" *)
   (* Applications *)
     | ScmApplic'(func, args) -> let n = string_of_int (List.length args) in
                                 let push_args_code = List.fold_right (fun arg acc-> acc ^ (generate_helper consts fvars env arg) ^ "push rax\n")  args "" in
@@ -280,7 +295,7 @@ module Code_Gen : CODE_GEN = struct
                                 "pop rbx     ;pop arg count\n" ^
                                 "shl rbx,3   ;rbx = rbx*8\n" ^
                                 "add rsp,rbx ;pop args\n"
-    | ScmApplicTP'(func, args) -> let n = string_of_int (List.length args) in
+    (* | ScmApplicTP'(func, args) -> let n = string_of_int (List.length args) in
                                   let push_args_code = List.fold_right (fun arg acc-> acc ^ (generate_helper consts fvars env arg) ^ "push rax\n")  args "" in
                                   ";applicTP exp to string\n" ^ push_args_code ^ 
                                   "push " ^ n ^ "\n" ^
@@ -290,14 +305,14 @@ module Code_Gen : CODE_GEN = struct
                                   "push qword[rbp + 8 * 1] ;old ret addr\n" ^
                                   "CHANGE_APPLICTP_STACK " ^ (string_of_int (3 + (List.length args))) ^ "\n" ^
                                   "CLOSURE_CODE rbx, rax\n" ^
-                                  "jmp rbx\n"
+                                  "jmp rbx\n" *)
     | _ -> raise (X_not_recognized_expression exp)
 
 
-  (* and generate_sequence consts fvars env seq =
+  and generate_sequence consts fvars env seq =
     match seq with
     | (hd :: tl) -> generate_helper consts fvars env hd ^ "\n" ^ generate_sequence consts fvars env tl
-    |_->"\n" *)
+    |_->"\n"
 
   and generate_or consts fvars env exp c =
     match exp with

@@ -104,10 +104,12 @@ main:
 user_code_fragment:
 ;;; The code you compiled will be added here.
 ;;; It will be executed immediately after the closures for 
-;;; the primitive procedures are set up.\n";;
+;;; the primitive procedures are set up.\n
+;;; ---------------------------- Generated Code Here ----------------------------\n";;
 
 let clean_exit =
-  ";;; Clean up the dummy frame, set the exit status to 0 (\"success\"), 
+  "\n;;; --------------------------- End of Generated Code ---------------------------
+   ;;; Clean up the dummy frame, set the exit status to 0 (\"success\"), 
    ;;; and return from main
    pop rbp
    add rsp, 3*8

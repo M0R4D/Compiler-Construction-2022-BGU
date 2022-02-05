@@ -272,7 +272,8 @@ module Semantic_Analysis : SEMANTIC_ANALYSIS = struct
 
   let run_semantics expr =
     box_set
-      (annotate_tail_calls
-         (annotate_lexical_addresses expr))
+      (* (annotate_tail_calls *)
+         (annotate_lexical_addresses expr)
+         (* ) *)
 
 end;; (* end of module Semantic_Analysis *)

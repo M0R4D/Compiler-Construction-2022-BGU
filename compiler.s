@@ -324,10 +324,12 @@
 		sub %1, WORD_SIZE+TYPE_SIZE
 %endmacro
 
-%macro MAKE_LITERAL_STRING 2
+%macro MAKE_LITERAL_STRING 1
 	db T_STRING
-	dq %1
-	db %2
+	dq (%%end_str - %%str)
+	%%str:
+		db %1
+	%%end_str:
 %endmacro
 
 %macro MAKE_LITERAL 2 ; Make a literal of type %1
