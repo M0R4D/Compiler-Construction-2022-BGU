@@ -189,80 +189,80 @@ module Code_Gen : CODE_GEN = struct
     | ScmConst'(c) -> "mov rax, const_tbl + " ^ string_of_int(find_const_index_in_table consts c) ^ "\n"
   (* Parameters: get, set *)
     | ScmVar'(VarParam( _ , minor)) -> "mov rax, qword [rbp + 8 * (4 + " ^ string_of_int minor ^ ")] \n"
-    | ScmSet'(VarParam( _ , minor ), value) -> generate_helper consts fvars env value ^ 
-                                               "mov qword [rbp + 8 * (4 + " ^ string_of_int minor ^ ")], rax\n
-                                             mov rax, SOB_VOID_ADDRESS \n"
+    | ScmSet'(VarParam( _ , minor ), value) ->  generate_helper consts fvars env value ^ 
+                                                "mov qword [rbp + 8 * (4 + " ^ string_of_int minor ^ ")], rax\n" ^
+                                                "mov rax, SOB_VOID_ADDRESS \n"
   (* Bound Vars: get, set *)
-    | ScmVar'(VarBound( _ , major, minor)) -> "mov rax, qword [rbp + 8 * 2] \n
-                                            mov rax, qword [rax + 8 * " ^ string_of_int major ^ "] \n
-                                            mov rax, qword [rax + 8 * " ^ string_of_int minor ^ "] \n"
+    | ScmVar'(VarBound( _ , major, minor)) -> "mov rax, qword [rbp + 8 * 2] \n" ^
+                                              "mov rax, qword [rax + 8 * " ^ string_of_int major ^ "] \n" ^
+                                              "mov rax, qword [rax + 8 * " ^ string_of_int minor ^ "] \n"
     | ScmSet'(VarBound( _ , major, minor ), value) -> generate_helper consts fvars env value ^ 
-                                                      "mov rbx, qword[rbp + 8 * 2] \n
-                                                    mov rbx, qword [rbx + 8 * " ^ string_of_int major ^ "] \n
-                                                    mov qword [rbx + 8 * " ^ string_of_int minor ^ "], rax \n
-                                                    mov rax, SOB_VOID_ADDRESS \n"
+                                                      "mov rbx, qword[rbp + 8 * 2] \n" ^
+                                                      "mov rbx, qword [rbx + 8 * " ^ string_of_int major ^ "] \n" ^
+                                                      "mov qword [rbx + 8 * " ^ string_of_int minor ^ "], rax \n" ^
+                                                      "mov rax, SOB_VOID_ADDRESS \n"
   (* Free Vars: get, set *)
     | ScmVar'(VarFree(v)) -> "mov rax, qword[fvar_tbl + " ^ string_of_int (find_fvar_in_fvars_table fvars v) ^ "]\n"
     | ScmSet'(VarFree(v), value) -> generate_helper consts fvars env value ^ 
-                                    "mov qword [fvar_tbl + " ^ string_of_int (find_fvar_in_fvars_table fvars v) ^ "], rax \n
-                                  mov rax, SOB_VOID_ADDRESS \n"
+                                    "mov qword [fvar_tbl + " ^ string_of_int (find_fvar_in_fvars_table fvars v) ^ "], rax \n" ^
+                                    "mov rax, SOB_VOID_ADDRESS \n"
   (* Define *)
     (* | ScmDef'(var, value) -> generate_helper consts fvars env (ScmSet'(var, value)) *)
     | ScmDef'(VarFree(var), value) -> generate_helper consts fvars env value ^ 
-                            "mov qword [fvar_tbl + " ^ string_of_int (find_fvar_in_fvars_table fvars var) ^ "], rax \n
-                            mov rax, SOB_VOID_ADDRESS \n"
+                                      "mov qword [fvar_tbl + " ^ string_of_int (find_fvar_in_fvars_table fvars var) ^ "], rax \n" ^
+                                      "mov rax, SOB_VOID_ADDRESS \n"
   (* Sequences *)
     | ScmSeq'(seq) -> (List.fold_left(fun acc expr-> acc ^ (generate_helper consts fvars env expr) ^ "\n") "" seq)
   (* Or *)
-    | ScmOr'(exprs) -> let c = inc_and_update count in
-                 generate_or consts fvars env exprs c ^ "\n"
+    | ScmOr'(exprs) ->  let c = inc_and_update count in
+                        generate_or consts fvars env exprs c ^ "\n"
   (* If *)
     | ScmIf'(test, dit, dif) -> let c = inc_and_update count in
-        generate_helper consts fvars env test ^ 
-        "\ncmp rax, SOB_FALSE_ADDRESS \n" ^ 
-        "je Lelse" ^ string_of_int c ^ "\n" ^ 
-        generate_helper consts fvars env dit ^ "\n
-                              jmp Lexit"^ string_of_int c ^"\n
-                              Lelse" ^ string_of_int c ^ ":\n" ^ 
-        generate_helper consts fvars env dif ^ "Lexit" ^ string_of_int c ^ ":\n"
+                                generate_helper consts fvars env test ^ 
+                                "\ncmp rax, SOB_FALSE_ADDRESS \n" ^ 
+                                "je Lelse" ^ string_of_int c ^ "\n" ^ 
+                                generate_helper consts fvars env dit ^ "\n" ^
+                                "jmp Lexit" ^ string_of_int c ^ "\n" ^
+                                "Lelse" ^ string_of_int c ^ ":\n" ^ 
+                                generate_helper consts fvars env dif ^ "Lexit" ^ string_of_int c ^ ":\n"
   (* Boxes: ScmBoxGet' and ScmBoxSet' *)
-    | ScmBox'(VarParam( _ , minor)) -> "; Sexpression: Boxing\n" ^ 
-    "mov rax, qword[rbp + 8 * (4 + " ^ string_of_int minor ^ ")]\n" ^ "push SOB_NIL_ADDRESS\n" ^ 
-    "push rax\n" ^ "push 2\n" ^ "push SOB_NIL_ADDRESS\n" ^ "call cons\n" ^ 
-    "add rsp,8*1\n" ^ "pop rbx\n" ^ "shl rbx,3\n" ^ "add rsp,rbx\n" ^
-    "mov qword[rbp + 8 * (4 + " ^ string_of_int minor ^ ")],rax\n"
-    (* | ScmBox'(VarParam( _ , minor)) -> 
-                                    ";box to string\nmov rax, qword[rbp + 8 * (4 + " ^ string_of_int minor ^ ")]\n" ^
-                                    "push SOB_NIL_ADDRESS ; something for the cdr\n" ^
-                                    "push rax             ; car\n" ^
-                                    "push 2               ; argc\n" ^
-                                    "push SOB_NIL_ADDRESS ;fake env\n" ^
-                                    "call cons\n" ^
-                                    "add rsp,8*1          ;pop env\n" ^
-                                    "pop rbx              ;pop argc\n" ^
-                                    "shl rbx,3            ;rbx=rbx*8\n" ^
-                                    "add rsp,rbx          ;pop args\n" ^
-                                    "mov qword[rbp + 8 * (4 + " ^ string_of_int minor ^ ")],rax\n" *)
-    | ScmBoxGet'(var) -> generate_helper consts fvars env (ScmVar'(var)) ^ 
-    "push rax\n" ^ "push 1\n" ^ "push SOB_NIL_ADDRESS\n" ^ "call car\n" ^
-    "add rsp,8*1\n" ^ "pop rbx\n" ^ "shl rbx,3\n" ^ "add rsp, rbx\n" 
-    (* | ScmBoxGet'(var) -> generate_helper consts fvars env (ScmVar'(var)) ^ "\nmov rax, qword[rax]\n" *)
-    | ScmBoxSet'(var, value) -> generate_helper consts fvars env value ^ "push rax\n" ^
-    generate_helper consts fvars env (ScmVar'(var)) ^
-    "push rax\n" ^ "push 2\n" ^ "push SOB_NIL_ADDRESS\n" ^ "call set_car\n" ^
-    "add rsp, 8\n" ^ "pop rbx\n" ^ "shl rbx, 3\n" ^ "add rsp, rbx\n" ^ "mov rax,SOB_VOID_ADDRESS\n"
-  
-    (* | ScmBoxSet'(var, value) -> generate_helper consts fvars env value ^ "\npush rax\n" ^ 
-                                generate_helper consts fvars env (ScmVar'(var)) ^ 
-                                "\n pop qword[rax] \n
-                              mov rax, SOB_VOID_ADDRESS \n" *)
+    | ScmBox'(VarParam( _ , minor)) -> "mov rax, qword[rbp + 8 * (4 + " ^ string_of_int minor ^ ")]\n" ^ "push SOB_NIL_ADDRESS\n" ^ 
+                                        "push rax\n" ^ 
+                                        "push 2\n" ^ 
+                                        "push SOB_NIL_ADDRESS\n" ^ 
+                                        "call cons\n" ^ 
+                                        "add rsp,8 * 1\n" ^ 
+                                        "pop rbx\n" ^ 
+                                        "shl rbx,3\n" ^ 
+                                        "add rsp,rbx\n" ^
+                                        "mov qword[rbp + 8 * (4 + " ^ string_of_int minor ^ ")],rax\n"
+    | ScmBoxGet'(var) ->  generate_helper consts fvars env (ScmVar'(var)) ^ 
+                          "push rax\n" ^ 
+                          "push 1\n" ^ 
+                          "push SOB_NIL_ADDRESS\n" ^ 
+                          "call car\n" ^
+                          "add rsp,8*1\n" ^ 
+                          "pop rbx\n" ^ 
+                          "shl rbx,3\n" ^ 
+                          "add rsp, rbx\n" 
+    | ScmBoxSet'(var, value) -> generate_helper consts fvars env value ^ 
+                                "push rax\n" ^
+                                generate_helper consts fvars env (ScmVar'(var)) ^
+                                "push rax\n" ^ 
+                                "push 2\n" ^ 
+                                "push SOB_NIL_ADDRESS\n" ^ 
+                                "call set_car\n" ^
+                                "add rsp, 8\n" ^ 
+                                "pop rbx\n" ^ "shl rbx, 3\n" ^ 
+                                "add rsp, rbx\n" ^ 
+                                "mov rax,SOB_VOID_ADDRESS\n"
   (* Lambdas: ScmLambdaSimple' and ScmLambdaOpt' *)
     | ScmLambdaSimple'(args, body) -> let c = inc_and_update count in
                                       let lcode = "Lcode" ^ (string_of_int c) in 
                                       let lcont = "Lcont" ^ (string_of_int c) in
-                                      ";lambda expr\nMAKE_ENV " ^ (string_of_int env) ^ 
-                                      "\nmov rbx, rax\n"^
-                                      "MAKE_CLOSURE(rax, rbx, "  ^ lcode ^ ")\n"^
+                                      "MAKE_ENV " ^ (string_of_int env) ^ 
+                                      "\nmov rbx, rax\n" ^
+                                      "MAKE_CLOSURE(rax, rbx, "  ^ lcode ^ ")\n" ^
                                       "jmp " ^ lcont ^ "\n" ^
                                       lcode ^ ":\n" ^
                                       "push rbp\n" ^
@@ -275,12 +275,12 @@ module Code_Gen : CODE_GEN = struct
                                           let lcode = "Lcode" ^ (string_of_int c) in 
                                           let lcont = "Lcont" ^ (string_of_int c) in
                                           let num_of_desired_args = (string_of_int ((List.length args) + 1)) in
-                                          ";lambda optional\nMAKE_ENV " ^ (string_of_int env) ^ 
-                                          "\nmov rbx, rax\n"^
-                                          "MAKE_CLOSURE(rax, rbx, "  ^ lcode ^ ")\n"^
+                                          "MAKE_ENV " ^ (string_of_int env) ^ 
+                                          "\nmov rbx, rax\n" ^
+                                          "MAKE_CLOSURE(rax, rbx, "  ^ lcode ^ ")\n" ^
                                           "jmp " ^ lcont ^ "\n" ^
                                           lcode ^ ":\n" ^ 
-                                          "CHANGE_STACK_OF_LAMBDA_OPT " ^ num_of_desired_args ^"\n" ^
+                                          "CHANGE_STACK_OF_LAMBDA_OPT " ^ num_of_desired_args ^ "\n" ^
                                           "push rbp\n" ^
                                           "mov rbp, rsp\n" ^
                                           generate_helper consts fvars (env + 1) body ^
@@ -297,13 +297,13 @@ module Code_Gen : CODE_GEN = struct
                                 "push rbx\n" ^
                                 "CLOSURE_CODE rbx, rax\n" ^
                                 "call rbx\n" ^
-                                "add rsp,8*1 ;pop env\n" ^
-                                "pop rbx     ;pop arg count\n" ^
-                                "shl rbx,3   ;rbx = rbx*8\n" ^
-                                "add rsp,rbx ;pop args\n"
+                                "add rsp, 8 * 1 ;pop env\n" ^
+                                "pop rbx        ;pop arg count\n" ^
+                                "shl rbx, 3     ;rbx = rbx*8\n" ^
+                                "add rsp,rbx    ;pop args\n"
     | ScmApplicTP'(func, args) -> let n = string_of_int (List.length args) in
                                   let push_args_code = List.fold_right (fun arg acc-> acc ^ (generate_helper consts fvars env arg) ^ "push rax\n")  args "" in
-                                  ";applicTP exp to string\n" ^ push_args_code ^ 
+                                  "\n" ^ push_args_code ^ 
                                   "push " ^ n ^ "\n" ^
                                   (generate_helper consts fvars env func) ^
                                   "CLOSURE_ENV rbx, rax\n" ^
@@ -317,14 +317,14 @@ module Code_Gen : CODE_GEN = struct
 
   and generate_sequence consts fvars env seq =
     match seq with
-    | (hd :: tl) -> generate_helper consts fvars env hd ^ "\n" ^ generate_sequence consts fvars env tl
-    |_->"\n"
+    | (hd :: tl)  -> generate_helper consts fvars env hd ^ "\n" ^ generate_sequence consts fvars env tl
+    | _ -> "\n"
 
   and generate_or consts fvars env exp c =
     match exp with
-    | [] -> "Lexit" ^ string_of_int c ^ ":\n"
-    | (hd :: []) -> generate_helper consts fvars env hd ^ "\n" ^ generate_or consts fvars env [] c
-    | (hd :: tl) -> generate_helper consts fvars env hd ^ "\ncmp rax, SOB_FALSE_ADDRESS \njne Lexit" ^ string_of_int c ^ "\n" ^ generate_or consts fvars env tl c ^ "\n"
+    | []          -> "Lexit" ^ string_of_int c ^ ":\n"
+    | (hd :: [])  -> generate_helper consts fvars env hd ^ "\n" ^ generate_or consts fvars env [] c
+    | (hd :: tl)  -> generate_helper consts fvars env hd ^ "\ncmp rax, SOB_FALSE_ADDRESS \njne Lexit" ^ string_of_int c ^ "\n" ^ generate_or consts fvars env tl c ^ "\n"
 
   
   let generate consts fvars e = generate_helper consts fvars 0 e;;

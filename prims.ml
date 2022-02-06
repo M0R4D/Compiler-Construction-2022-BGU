@@ -370,29 +370,73 @@ module Prims : PRIMS = struct
       ] in
     String.concat "\n\n" (List.map (fun (a, b, c) -> (b c a)) misc_parts);;
 
-    let apply_operation = "apply:\n" ^ "push rbp\n" ^ "mov rbp, rsp\n" ^ "mov r8, 0\n" ^
-  "mov r9, qword [rbp + 8*3]\n" ^ "dec r9\n" ^ "mov rbx, PVAR(r9)\n" ^
-  "apply_push_list:\n" ^
-  "cmp rbx, SOB_NIL_ADDRESS\n" ^ "je apply_end_of_push_list\n" ^ "CAR rdx, rbx ; rdx = car(lst)\n" ^
-  "CDR rbx, rbx\n" ^ "push rdx\n" ^ "inc r8\n" ^ "jmp apply_push_list\n" ^
-  "apply_end_of_push_list:\n" ^
-  "mov r9, 0\n" ^ "mov r10, r8\n" ^ "dec r10\n" ^
-  "apply_swap_list_args:\n" ^
-  "cmp r9, r10\n" ^ "jge apply_end_of_swap_list_args\n" ^ "mov r11, qword [rsp + 8*r9]\n" ^
-  "mov r12, qword [rsp + 8*r10]\n" ^ "mov qword [rsp + 8*r9], r12\n" ^ "mov qword [rsp + 8*r10], r11\n" ^
-  "inc r9\n" ^ "dec r10\n" ^ "jmp apply_swap_list_args\n" ^
-  "apply_end_of_swap_list_args:\n" ^
-  "mov r9, qword [rbp + 8*3]\n" ^ "sub r9, 2\n" ^ "mov r10, r9\n" ^
-  "apply_push_args:\n" ^
-  "cmp r9, 0\n" ^ "je apply_end_of_push_args\n" ^ "push PVAR(r9) \n" ^
-  "dec r9\n" ^ "jmp apply_push_args\n" ^
-  "apply_end_of_push_args:\n" ^
-  "mov r9, r10\n" ^ "add r9, r8\n" ^ "mov rbx, r9\n" ^ "push r9\n" ^ "mov rax, qword [rbp + 8*4]\n" ^
-  "CLOSURE_ENV r9, rax\n" ^ "push r9\n" ^ "push qword [rbp + 8*1]\n" ^ "push qword [rbp]\n" ^
-  "mov rdx, qword [rbp]\n" ^ "add r10, 6\n" ^ "mov r9, rbx\n" ^ "add r9, 4\n" ^ "mov r11, r10\n" ^ "mov rcx, r9\n" ^
-  "apply_shift_stack:\n" ^
-  "dec r10\n" ^ "dec rcx\n" ^ "mov r8, qword [rsp + 8*rcx]\n" ^ "mov qword [rbp + 8*r10], r8\n" ^ "cmp rcx, 0\n" ^
-  "jne apply_shift_stack\n" ^ "shl r11, 3\n" ^ "add rsp, r11\n" ^ "pop rbp\n" ^ "jmp qword [rax + 1 + 8]\n"
+    let apply_operation = 
+      "apply:
+      push rbp
+      mov rbp, rsp
+      mov r8, 0
+      mov r9, qword [rbp + 8*3]
+      dec r9
+      mov rbx, PVAR(r9)\n" ^
+"apply_push_list:
+      cmp rbx, SOB_NIL_ADDRESS
+      je apply_end_of_push_list
+      CAR rdx, rbx ; rdx = car(lst)
+      CDR rbx, rbx
+      push rdx
+      inc r8
+      jmp apply_push_list\n" ^
+"apply_end_of_push_list:
+      mov r9, 0
+      mov r10, r8
+      dec r10\n" ^
+"apply_swap_list_args:
+      cmp r9, r10
+      jge apply_end_of_swap_list_args
+      mov r11, qword [rsp + 8*r9]
+      mov r12, qword [rsp + 8*r10]
+      mov qword [rsp + 8*r9], r12
+      mov qword [rsp + 8*r10], r11
+      inc r9
+      dec r10
+      jmp apply_swap_list_args\n" ^
+"apply_end_of_swap_list_args:
+      mov r9, qword [rbp + 8*3]
+      sub r9, 2
+      mov r10, r9\n" ^
+"apply_push_args:
+      cmp r9, 0
+      je apply_end_of_push_args
+      push PVAR(r9) 
+      dec r9
+      jmp apply_push_args\n" ^
+"apply_end_of_push_args:
+      mov r9, r10
+      add r9, r8
+      mov rbx, r9
+      push r9
+      mov rax, qword [rbp + 8*4]
+      CLOSURE_ENV r9, rax
+      push r9
+      push qword [rbp + 8*1]
+      push qword [rbp]
+      mov rdx, qword [rbp]
+      add r10, 6
+      mov r9, rbx
+      add r9, 4
+      mov r11, r10
+      mov rcx, r9\n" ^
+"apply_shift_stack:
+      dec r10
+      dec rcx
+      mov r8, qword [rsp + 8*rcx]
+      mov qword [rbp + 8*r10], r8
+      cmp rcx, 0
+      jne apply_shift_stack
+      shl r11, 3
+      add rsp, r11
+      pop rbp
+      jmp qword [rax + 1 + 8]\n"
 
 
   (* This is the interface of the module. It constructs a large x86 64-bit string using the routines
