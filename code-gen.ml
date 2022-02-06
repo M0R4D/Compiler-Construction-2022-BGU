@@ -110,7 +110,13 @@ module Code_Gen : CODE_GEN = struct
           | ScmNumber(ScmReal(r)) -> run tl (index + 1 + 8) (table @ [ScmNumber(ScmReal(r)), (index, "MAKE_LITERAL_FLOAT(" ^ (string_of_float r) ^ ")")])
           | ScmString(s) -> run tl (index + 1 + 8 + (String.length s)) (table @ [ScmString(s), (index, "MAKE_LITERAL_STRING \"" ^ s ^ "\"")])
           | ScmSymbol(s) -> run tl (index + 1 + 8) (table @ [ScmSymbol(s), (index, "MAKE_LITERAL_SYMBOL(const_tbl + " ^ string_of_int(find_const_index_in_table table (ScmString s)) ^ ")" )])
-          | ScmVector(v) -> run tl (index + 1 + 8 + (List.length v)) (table @ [ScmVector(v), (index, "")])
+          | ScmVector(lst) -> if (List.length lst = 0) 
+              then run tl (index + 1) (table @ [(ScmVector(lst), (index, "MAKE_LITERAL_VECTOR"))]) 
+              else 
+                (let hd = "const_tbl+" ^ (string_of_int (find_const_index_in_table table (List.hd lst))) ^ " " in
+                 let tl = List.tl lst in
+                 let offset_list = List.fold_left (fun acc curr -> acc ^ ", const_tbl+" ^ (string_of_int (find_const_index_in_table table curr ))) "" tl in
+                 run tl (index + 9 + 8 * List.length lst) (table @ [ScmVector(lst), (index, ("MAKE_LITERAL_VECTOR " ^ hd ^ offset_list ^ "" ))]))
           | ScmPair(car, cdr) -> run tl (index + 1 + 8 + 8) (table @ [ScmPair(car, cdr), (index, "MAKE_LITERAL_PAIR(const_tbl + " ^ string_of_int(find_const_index_in_table table car) ^ ", const_tbl + " ^ string_of_int(find_const_index_in_table table cdr) ^ ")" )])
         ) 
     in 
@@ -243,7 +249,7 @@ module Code_Gen : CODE_GEN = struct
     (* | ScmBoxGet'(var) -> generate_helper consts fvars env (ScmVar'(var)) ^ "\nmov rax, qword[rax]\n" *)
     | ScmBoxSet'(var, value) -> generate_helper consts fvars env value ^ "push rax\n" ^
     generate_helper consts fvars env (ScmVar'(var)) ^
-    "push rax\n" ^ "push 2\n" ^ "push SOB_NIL_ADDRESS\n" ^ "call setcar\n" ^
+    "push rax\n" ^ "push 2\n" ^ "push SOB_NIL_ADDRESS\n" ^ "call set_car\n" ^
     "add rsp, 8\n" ^ "pop rbx\n" ^ "shl rbx, 3\n" ^ "add rsp, rbx\n" ^ "mov rax,SOB_VOID_ADDRESS\n"
   
     (* | ScmBoxSet'(var, value) -> generate_helper consts fvars env value ^ "\npush rax\n" ^ 
@@ -265,7 +271,7 @@ module Code_Gen : CODE_GEN = struct
                                       "leave\n" ^
                                       "ret\n" ^
                                       lcont ^ ":\n"
-    (* | ScmLambdaOpt'(args, opt, body) ->  let c = inc_and_update count in
+    | ScmLambdaOpt'(args, opt, body) ->  let c = inc_and_update count in
                                           let lcode = "Lcode" ^ (string_of_int c) in 
                                           let lcont = "Lcont" ^ (string_of_int c) in
                                           let num_of_desired_args = (string_of_int ((List.length args) + 1)) in
@@ -280,11 +286,11 @@ module Code_Gen : CODE_GEN = struct
                                           generate_helper consts fvars (env + 1) body ^
                                           "leave\n" ^
                                           "ret\n" ^
-                                          lcont ^ ":\n" *)
+                                          lcont ^ ":\n"
   (* Applications *)
     | ScmApplic'(func, args) -> let n = string_of_int (List.length args) in
                                 let push_args_code = List.fold_right (fun arg acc-> acc ^ (generate_helper consts fvars env arg) ^ "push rax\n")  args "" in
-                                ";application exp to string\n" ^ push_args_code ^ 
+                                push_args_code ^ 
                                 "push " ^ n ^ "\n" ^
                                 (generate_helper consts fvars env func) ^
                                 "CLOSURE_ENV rbx, rax\n" ^
@@ -295,7 +301,7 @@ module Code_Gen : CODE_GEN = struct
                                 "pop rbx     ;pop arg count\n" ^
                                 "shl rbx,3   ;rbx = rbx*8\n" ^
                                 "add rsp,rbx ;pop args\n"
-    (* | ScmApplicTP'(func, args) -> let n = string_of_int (List.length args) in
+    | ScmApplicTP'(func, args) -> let n = string_of_int (List.length args) in
                                   let push_args_code = List.fold_right (fun arg acc-> acc ^ (generate_helper consts fvars env arg) ^ "push rax\n")  args "" in
                                   ";applicTP exp to string\n" ^ push_args_code ^ 
                                   "push " ^ n ^ "\n" ^
@@ -305,7 +311,7 @@ module Code_Gen : CODE_GEN = struct
                                   "push qword[rbp + 8 * 1] ;old ret addr\n" ^
                                   "CHANGE_APPLICTP_STACK " ^ (string_of_int (3 + (List.length args))) ^ "\n" ^
                                   "CLOSURE_CODE rbx, rax\n" ^
-                                  "jmp rbx\n" *)
+                                  "jmp rbx\n"
     | _ -> raise (X_not_recognized_expression exp)
 
 

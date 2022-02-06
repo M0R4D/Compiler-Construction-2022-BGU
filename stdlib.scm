@@ -44,11 +44,15 @@
 
 (define cons*
 ;   #;(Add your implementation here)
-  (letrec ((last_element (lambda (l)
-   (if (null? (cdr l))
-       (car l)
-       (last_element (cdr l)))))) (lambda x
-     (fold-left cons (last_element x) (cdr (fold-left cons '() x))))))
+;   (letrec ((last_element (lambda (l)
+;    (if (null? (cdr l))
+;        (car l)
+;        (last_element (cdr l)))))) (lambda x
+;      (fold-left cons (last_element x) (cdr (fold-left cons '() x))))))
+  (lambda l
+    (cond ((null? l) null)
+          ((null? (cdr l)) (car l))
+          (else (cons (car l) (apply cons* (cdr l)))))))
 	 
 
 (define append

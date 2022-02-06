@@ -116,7 +116,7 @@ module Semantic_Analysis : SEMANTIC_ANALYSIS = struct
       | ScmDef (ScmVar(var), value)     -> ScmDef' (tag_lexical_address_for_var var params env, run value params env) (* DONE *)
       | ScmOr exps                      -> ScmOr' (List.map (fun e -> run e params env) exps) (* DONE *)
       | ScmLambdaSimple (vars, body)    -> ScmLambdaSimple' (vars, run body vars ([params] @ env)) (* DONE *)
-      | ScmLambdaOpt (vars, var, body)  -> ScmLambdaOpt' (vars, var, run body (var :: vars) ([params] @ env)) (* DONE *)
+      | ScmLambdaOpt (vars, var, body)  -> ScmLambdaOpt' (vars, var, run body (vars @ [var]) ([params] @ env)) (* DONE *)
       | ScmApplic (f, args)             -> ScmApplic' (run f params env, List.map (fun e -> run e params env) args) (* DONE *)
       | _ -> raise X_this_should_not_happen
    in 
@@ -214,10 +214,10 @@ module Semantic_Analysis : SEMANTIC_ANALYSIS = struct
       | _ -> (exp1,exp2,exp3)
         
       
-      and  max_in_list l x = 
+      and max_in_list l x = 
       match l with
       | [] -> x
-      | car::cdr -> let m = Pervasives.max x car in max_in_list cdr m
+      | car::cdr -> let m = max x car in max_in_list cdr m
 
     and check_exp elemnt e_list (exp1,exp2,exp3) = 
       match e_list with
@@ -272,8 +272,7 @@ module Semantic_Analysis : SEMANTIC_ANALYSIS = struct
 
   let run_semantics expr =
     box_set
-      (* (annotate_tail_calls *)
-         (annotate_lexical_addresses expr)
-         (* ) *)
+      (annotate_tail_calls
+         (annotate_lexical_addresses expr))
 
 end;; (* end of module Semantic_Analysis *)

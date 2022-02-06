@@ -310,11 +310,13 @@ and let_vars_helper ribs =
   match ribs with
   | ScmNil -> ScmNil
   | ScmPair(ScmPair(ScmSymbol(var), ScmPair( _ , ScmNil)), rest) -> ScmPair(ScmSymbol(var), let_vars_helper rest)
+  | _ -> raise (X_syntax_error(ribs, "let vars pattern not recognized"))
 
 and let_exprs_helper ribs = 
   match ribs with
   | ScmNil -> ScmNil
   | ScmPair(ScmPair( _ , ScmPair(exp, ScmNil)), rest) -> ScmPair(exp, let_exprs_helper rest)
+  | _ -> raise (X_syntax_error(ribs, "let exprs pattern not recognized"))
 
 and macro_expansion_let_star ribs body =
 (* {(let* ((var1 expr1) (var2 expr2) · · · (varn exprn)) body)} = 

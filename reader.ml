@@ -26,8 +26,8 @@ type sexpr =
   | ScmPair of (sexpr * sexpr);;
 
 type standart_or_interpolated =
-  |Static of string
-  |Dynamic of sexpr
+  | Static of string
+  | Dynamic of sexpr
 
 module type READER = sig
     val nt_sexpr : sexpr PC.parser
@@ -144,13 +144,11 @@ and nt_float str  =
       |(None, num) -> ScmNumber (ScmReal num)
       | _-> ScmNil) in nt1 str
                               
-and nt_number str = disj_list[nt_float;nt_frac;nt_int] str
+and nt_number str = disj_list[nt_float; nt_frac; nt_int] str
  
 (* ------------------------------- *)
 
 (* and nt_int str = raise X_not_yet_implemented *)
-  (* let nt1 = pack nt_integer (fun num -> ScmNumber(ScmRational(num, 1))) in
-   nt1 str *)
 (* and nt_frac str = raise X_not_yet_implemented
 and nt_integer_part str = raise X_not_yet_implemented
 and nt_mantissa str = raise X_not_yet_implemented
@@ -172,11 +170,10 @@ and nt_boolean =
     (pack boolt (fun _ -> ScmBoolean(true))) 
     (pack boolf (fun _ -> ScmBoolean(false)))
 
-and nt_char_simple str = 
-  (* raise X_not_yet_implemented *)
-  range '!' '~'
-(* and make_named_char char_name ch = 
-pack (word char_name) (fun _ -> ch) *)
+and nt_char_simple str = (* raise X_not_yet_implemented *)
+  let nt1 = diff nt_any nt_whitespace in
+  (* let nt1 = not_followed_by nt1 nt1 in *)
+  nt1 str;
 
 and make_named_char name ch = pack (word_ci name) (fun n -> ch)
 
@@ -189,39 +186,27 @@ and nt_char_named str =
                (make_named_char "space" ' ');
                (make_named_char "tab" '\t')] in
   nt1 str
-(* and nt_char_hex str = 
-  let nt_x = char 'x' in 
-  let nt_hex = disj (range '0' '9') (range 'a' 'f') in 
-  caten nt_x (plus nt_hex) *)
+(* and nt_char_hex str = raise X_not_yet_implemented *)
 
-(* and nt_char str = 
-   let nt_char_prefix = word "#\\" in
-  let nt2 = disj nt_char_named nt_char_hex in 
-  let nt1 = caten 
-                nt_char_prefix
-                nt2
-                in 
-  pack nt1 (fun (l, p) -> ScmChar p) *)
+(* and nt_char str = raise X_not_yet_implemented *)
 
 (* ---------------------- *)
-and nt_hex_char str = 
+and char_prefix str = 
+  let nt1 = char '#' in
+  let nt2 = char '\\' in
+  let nt1 = caten nt1 nt2 in
+  nt1 str
+and nt_char_hex str =
   let nt1 = char_ci 'x' in
-  let numbers = range '0' '9' in
-  let letters = range_ci 'a' 'f' in
-  let nt2 = plus (disj numbers letters) in
+  let nt2 = plus (disj_list [range '0' '9'; range_ci 'a' 'f']) in
   let nt2 = caten nt1 nt2 in
-  let nt3 = pack nt2 (fun (_, hex) -> char_of_int(int_of_string("0x" ^ list_to_string(hex)))) in
+  let nt3 = pack nt2 (fun(x, num) -> char_of_int(int_of_string("0x" ^ list_to_string(num)))) in
   nt3 str;
-
-and nt_hex_unicode_char str = (caten (char 'x') (plus nt_hex_char)) str
-
-and nt_char str =
-  let simple = diff nt_any nt_whitespace in
-  let simple = not_followed_by simple simple in
-  let nt1 = disj_list [nt_hex_char; nt_char_named; simple] in
-  let nt2 = caten (word "#\\") nt1 in
-  let nt3 = pack nt2 (fun (pre, ch) -> ScmChar ch) in
-  nt3 str                
+and nt_char str = 
+  let nt1 = disj_list [nt_char_hex;nt_char_named;nt_char_simple] in
+  let nt2 = caten char_prefix nt1 in
+  let nt3 = pack nt2 (fun(pre,ch)-> ScmChar ch) in
+  nt3 str;
 (* ----------------------------- *)
 
 and nt_symbol_char str = 

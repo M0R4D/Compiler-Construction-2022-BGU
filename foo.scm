@@ -19,7 +19,7 @@
     (if '() 'pass 'fail)
     (if 'a 'excellent 'no-no)
     (if #f 'this-should-not-happen 'correct)
-    #;(if 'a 'b 'c)
+    (if 'a 'b 'c)
 }
 
 ;; ------ And test ------
@@ -83,4 +83,38 @@
 }
 
 ;; ------ Primitives test ------
-(+ 1 2 3)
+{
+    (+ 1 5)
+    (* 7 2)
+    (car '(1 2 3))
+    (cdr '(1 2 3))
+    (cons 1 2)
+    (eq? 1 1)
+    (= #f #f)
+    (zero? 0)
+    (zero? #t)
+    (not '())
+    (not #t)
+    (not #f)
+    (not 1)
+}
+
+;; ------ Library test ------
+{
+    (+ 1 2 3 4 5)
+    (fold-left + 0 '(1 2 3 4 5)) ;; => 15
+    (cons* 'a 'b 'c 'de)
+    (map (lambda (x) (+ x 1)) '(1 2 3 4 5))
+}
+
+;; ------ test ------
+{
+    (define a '(1 2))
+    a
+    (set-car! a 4)
+    a
+    (set-cdr! a '(5 6 7))
+    a
+    (integer->char 65)
+    (char->integer #\a)
+}
