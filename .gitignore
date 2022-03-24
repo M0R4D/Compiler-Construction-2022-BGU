@@ -1,4 +1,14 @@
 # ignore others folder
 others/*
+
+# ignore system folders and files
 .DS_Store
 .Trash-1001/*
+
+# ignore tests
+tests/bin/*
+tests/executables/*
+tests/inputs/*
+tests/outputs/*
+tests/expected_inputs/*
+tests/expected_outputs/*
