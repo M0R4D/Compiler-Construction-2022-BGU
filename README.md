@@ -1,5 +1,7 @@
 # Scheme Compiler
 
+## Compiler Project Final Grade 99/100 🥳🥳
+
 ## Git
 
 You'll be implementing this (and future) assignments by adding code to a Git repository. The first thing you need to 
